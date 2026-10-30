@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulator 3D (Dummy)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1114; --panel:#171a1f; --panel-2:#1e2228; --line:#2a2f37;
+    --text:#eef0f3; --muted:#9097a1; --brand:#3fbf4a; --brand-2:#2c9d36;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  button,input{font:inherit;color:inherit}
+  .notice{background:#2a2410;border-bottom:1px solid #4a3f14;color:#e8c766;font-size:12.5px;padding:8px 20px;text-align:center}
+  .notice a{color:#e8c766}
+  .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:calc(100vh - 34px)}
+  .stage{position:relative;display:flex;flex-direction:column;background:radial-gradient(ellipse 70% 60% at 50% 45%,#232830,#0f1114);overflow:hidden;min-width:0}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 24px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand b{font-size:20px;font-weight:800;font-style:italic;color:var(--brand);letter-spacing:-.5px}
+  .brand span{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+  .top-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .chip-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;transition:.15s;user-select:none;-webkit-user-select:none}
+  .chip-btn:hover{background:rgba(255,255,255,.12)}
+  .chip-btn.active{background:var(--brand);border-color:var(--brand);color:#06240a}
+  .chip-btn.active:hover{background:var(--brand-2)}
+  .presets{display:flex;gap:10px;padding:14px 24px;overflow-x:auto;scrollbar-width:thin;border-top:1px solid var(--line);background:rgba(0,0,0,.15);flex:0 0 auto}
+  .preset{flex:0 0 auto;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:8px 14px 8px 8px;cursor:pointer;transition:.15s;font-size:13px;font-weight:600}
+  .preset:hover{background:rgba(255,255,255,.1)}
+  .preset.active{border-color:var(--brand);background:rgba(63,191,74,.12)}
+  .preset .dots{display:flex}
+  .preset .dots i{width:18px;height:18px;border-radius:50%;border:2px solid #1b1e23;margin-left:-6px}
+  .preset .dots i:first-child{margin-left:0}
+  .view{flex:1;min-height:0;position:relative}
+  #view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer}
+  .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);font-size:14px;pointer-events:none}
+  .spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--brand);animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .progress{font-size:12.5px;color:var(--muted)}
+  .hint{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(0,0,0,.55);border-radius:999px;padding:7px 16px;font-size:12px;color:var(--muted);transition:opacity .4s;pointer-events:none}
+  .hint.hide{opacity:0}
+  .badge{position:absolute;left:16px;top:16px;display:none;align-items:center;gap:7px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--text);pointer-events:none}
+  .badge.show{display:flex}
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:var(--brand);flex:0 0 auto}
+  .panel{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .panel-head{padding:20px 22px 12px}
+  .panel-head h1{font-size:18px;margin:0 0 4px}
+  .panel-head p{margin:0;color:var(--muted);font-size:13px}
+  .panel-body{flex:1;overflow-y:auto;padding:6px 14px 14px}
+  .part{border:1px solid transparent;border-radius:14px;margin-bottom:6px;transition:.15s}
+  .part.open{background:var(--panel-2);border-color:var(--line)}
+  .part-row{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;padding:10px;cursor:pointer;text-align:left;border-radius:14px}
+  .part-row:hover{background:rgba(255,255,255,.04)}
+  .sw-big{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.15);flex:0 0 auto;box-shadow:inset 0 -6px 10px rgba(0,0,0,.25)}
+  .part-row .t{flex:1;min-width:0}
+  .part-row .t b{display:block;font-size:14px}
+  .part-row .t small{color:var(--muted);font-size:12px}
+  .part-row .chev{color:var(--muted);transition:.2s}
+  .part.open .chev{transform:rotate(180deg)}
+  .part-body{display:none;padding:2px 12px 14px}
+  .part.open .part-body{display:block}
+  .desc{color:var(--muted);font-size:12px;margin:0 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:7px}
+  .sw{aspect-ratio:1;border-radius:9px;border:1px solid rgba(255,255,255,.15);cursor:pointer;padding:0;transition:transform .1s}
+  .sw:hover{transform:scale(1.08)}
+  .sw.sel{outline:2px solid var(--brand);outline-offset:2px}
+  .sw.orig{background:repeating-linear-gradient(135deg,#3a3f46 0 4px,#23272d 4px 8px)!important;font-size:9px;font-weight:700;color:#cfd3d6}
+  .custom{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
+  .custom input[type=color]{width:34px;height:28px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px;cursor:pointer}
+  .custom input[type=text]{width:90px;background:#111418;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  .panel-foot{border-top:1px solid var(--line);padding:14px 18px 18px;display:grid;gap:10px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--panel-2);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn:hover{background:#262b33}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#06200a}
+  .btn.primary:hover{background:var(--brand-2)}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#222;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:20}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;height:auto}
+    .view{min-height:60vh}
+    .panel{border-left:0;border-top:1px solid var(--line)}
+    .topbar{padding:14px 16px}
+  }
+</style>
+</head>
+<body>
+<div class="notice">⚠ Demo / dummy: model 3D kursi pijat ini dipakai untuk menguji simulator 3D (putar, zoom &amp; ganti warna) — bukan produk jok bis Alldila. <a href="pilih-model.html">← Kembali ke pilih model</a></div>
+<div class="app">
+  <section class="stage">
+    <div class="topbar">
+      <div class="brand"><b>3D Viewer</b><span>Demo · Preview Model</span></div>
+      <div class="top-actions">
+        <button class="chip-btn" id="btnReset">Reset tampilan</button>
+        <button class="chip-btn" id="btnPan">Geser Bebas</button>
+        <button class="chip-btn" id="btnDetachBody">Lepas Bantalan</button>
+        <button class="chip-btn" id="btnDetachLegs">Lepas Kaki</button>
+        <button class="chip-btn" id="btnStudio">Interior Bus</button>
+        <button class="chip-btn" id="btnFull">Layar penuh</button>
+      </div>
+    </div>
+    <div class="view">
+      <canvas id="view"></canvas>
+      <div class="overlay" id="overlay"><div class="spinner"></div><div class="progress" id="progress">Memuat model 3D…</div></div>
+      <div class="hint" id="hint">Klik bagian kursi untuk pilih warna · drag untuk putar · scroll untuk zoom · "Geser Bebas" untuk geser tampilan</div>
+      <div class="badge" id="badge"><span class="dot"></span>Alldila Seats · Preview Interior Bus</div>
+    </div>
+    <div class="presets" id="presets"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <h1>Kustomisasi Warna</h1>
+      <p>Klik bagian kursi langsung di model 3D, atau pilih dari daftar di bawah.</p>
+    </div>
+    <div class="panel-body" id="parts"></div>
+    <div class="panel-foot">
+      <div class="btns">
+        <button class="btn" id="btnResetColors">Kembali ke warna asli</button>
+        <button class="btn primary" id="btnPng">Unduh PNG</button>
+      </div>
+    </div>
+  </aside>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+
+const canvas = document.getElementById('view');
+const overlay = document.getElementById('overlay');
+const progress = document.getElementById('progress');
+const hint = document.getElementById('hint');
+const stage = document.querySelector('.view');
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+const DARK_BG = new THREE.Color(0x14171c);
+scene.background = DARK_BG;
+
+/* ---------- interior bus (stilasi) ---------- */
+const INTERIOR_BG = new THREE.Color(0x20242b);
+const busGroup = new THREE.Group();
+busGroup.visible = false;
+scene.add(busGroup);
+
+const floorMat = new THREE.MeshPhongMaterial({color: 0x2b2d31, side: THREE.DoubleSide});
+const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), floorMat);
+floorMesh.rotation.x = -Math.PI / 2;
+busGroup.add(floorMesh);
+
+const ceilingMat = new THREE.MeshPhongMaterial({color: 0xd8d3c8, side: THREE.DoubleSide});
+const ceilingMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ceilingMat);
+ceilingMesh.rotation.x = Math.PI / 2;
+busGroup.add(ceilingMesh);
+
+const lightStripMat = new THREE.MeshBasicMaterial({color: 0xfff4d6});
+const lightStripMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), lightStripMat);
+busGroup.add(lightStripMesh);
+
+const wallMat = new THREE.MeshPhongMaterial({color: 0xd8d3c8});
+const wallMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), wallMat);
+busGroup.add(wallMesh);
+
+const frameMat = new THREE.MeshPhongMaterial({color: 0x2a2c30, side: THREE.DoubleSide});
+const glassMat = new THREE.MeshPhongMaterial({color: 0x9fb8c9, transparent: true, opacity: 0.35, side: THREE.DoubleSide});
+const WINDOW_COUNT = 3;
+const windowMeshes = [];
+for (let i = 0; i < WINDOW_COUNT; i++){
+  const frame = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), frameMat);
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glassMat);
+  busGroup.add(frame, glass);
+  windowMeshes.push({frame, glass});
+}
+
+function layoutBus(size, center, box){
+  const floorY = box.min.y - center.y;
+  const ceilingHeight = size.y * 1.9;
+  const interiorWidth = size.x * 3.2;
+  const interiorLength = size.z * 2.2;
+  const wallX = -interiorWidth / 2;
+  const aisleX = interiorWidth / 2;
+  const inward = -Math.sign(wallX);
+
+  floorMesh.scale.set(interiorWidth, interiorLength, 1);
+  floorMesh.position.set((wallX + aisleX) / 2, floorY + 0.5, 0);
+
+  ceilingMesh.scale.set(interiorWidth, interiorLength, 1);
+  ceilingMesh.position.set((wallX + aisleX) / 2, floorY + ceilingHeight, 0);
+
+  const stripLen = interiorLength * 0.8, stripW = size.x * 0.25, stripH = size.y * 0.02;
+  lightStripMesh.scale.set(stripW, stripH, stripLen);
+  lightStripMesh.position.set((wallX + aisleX) / 2, floorY + ceilingHeight - 1, 0);
+
+  const wallThickness = size.x * 0.08;
+  wallMesh.scale.set(wallThickness, ceilingHeight, interiorLength);
+  wallMesh.position.set(wallX, floorY + ceilingHeight / 2, 0);
+
+  const winW = interiorLength / WINDOW_COUNT * 0.6;
+  const winH = ceilingHeight * 0.4;
+  const winY = floorY + ceilingHeight * 0.62;
+  const frameW = winW * 1.15, frameH = winH * 1.12;
+  windowMeshes.forEach(({frame, glass}, i) => {
+    const z = (i - (WINDOW_COUNT - 1) / 2) * (interiorLength / WINDOW_COUNT);
+    frame.scale.set(frameW, frameH, 1);
+    frame.position.set(wallX + inward * (wallThickness / 2 + 0.5), winY, z);
+    frame.rotation.y = Math.PI / 2;
+    glass.scale.set(winW, winH, 1);
+    glass.position.set(wallX + inward * (wallThickness / 2 + 1), winY, z);
+    glass.rotation.y = Math.PI / 2;
+  });
+}
+
+const badgeEl = document.getElementById('badge');
+function setStudio(on){
+  state.studio = on;
+  scene.background = on ? INTERIOR_BG : DARK_BG;
+  busGroup.visible = on;
+  badgeEl.classList.toggle('show', on);
+}
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
+camera.position.set(220, 160, 260);
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x3a3f48, 1.2);
+scene.add(hemi);
+const key = new THREE.DirectionalLight(0xffffff, 1.6);
+key.position.set(200, 300, 150);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 1.1);
+fill.position.set(-200, 100, -150);
+scene.add(fill);
+const back = new THREE.DirectionalLight(0xffffff, 1.0);
+back.position.set(0, 250, -300);
+scene.add(back);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 10;
+controls.maxDistance = 4000;
+controls.target.set(0, 0, 0);
+
+/* ---------- mode geser bebas (freehand pan) ---------- */
+let panMode = false;
+function setPanMode(on){
+  panMode = on;
+  controls.mouseButtons.LEFT = on ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+  controls.mouseButtons.RIGHT = on ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
+  controls.touches.ONE = on ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
+  canvas.style.cursor = on ? 'grab' : 'pointer';
+}
+
+function resize(){
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ---------- warna per bagian ---------- */
+const SHELL = [['Gunmetal','#3e4147'],['Matte Black','#1d1e21'],['Titanium','#7c8188'],['Silver','#b9bdc2'],['Champagne','#b8a684'],['Pearl White','#e9e7e2'],['Bronze','#6e5440'],['Navy Metallic','#26324a']];
+const TRIM = [['Walnut','#6b4429'],['Teak','#9a6438'],['Ebony','#2a2420'],['Maple','#c49a63'],['Chrome','#c9cdd2'],['Carbon','#2a2c30'],['Rose Gold','#c08c78'],['Gold','#c49e45'],['Piano Black','#121315'],['Silver','#a7acb2']];
+const LEATHER = [['Onyx Black','#1b1c1f'],['Graphite','#2c3036'],['Charcoal','#3a3e44'],['Slate Grey','#4f555d'],['Silver Grey','#8a9097'],['Ivory','#e6dfd0'],['Pearl White','#f1efea'],['Cream','#d9c8a8'],
+  ['Tan','#b27b4c'],['Cognac','#8b4a22'],['Mocha','#5a3e30'],['Espresso','#3c2a21'],['Burgundy','#6a1f2b'],['Racing Red','#a3222a'],['Navy','#1f2c4c'],['Ocean Blue','#2f5a7e'],
+  ['Midnight','#1a2238'],['Olive','#555b3a'],['Forest','#28463a'],['Camel','#c19a6b'],['Sand','#cbb994'],['Plum','#4c2a3e'],['Teal','#1f5557'],['Orange','#c45a1c']];
+
+const PARTS3D = [
+  {key:'body',  label:'Body Utama (Bantalan)', desc:'Headrest, sandaran, dudukan & footrest', mat:'06c9f4b7-4175-47c2-86ee-b7986d3da2b7', pal:LEATHER},
+  {key:'shell', label:'Shell / Panel Luar',     desc:'Cangkang luar sisi kiri, kanan & belakang', mat:'875b1a09-b8a5-4e00-939d-97a3473205e9', pal:SHELL},
+  {key:'frame', label:'Rangka / Dasar',         desc:'Kaki dasar & aksen diagonal depan', mat:'2c86bf0b-2ff0-410b-9fb0-684e1c5fb106', pal:SHELL},
+  {key:'trim',  label:'List / Trim',            desc:'List tipis di tepi armrest & panel', mat:'dd8ddbaa-e1ee-4dea-bed5-ff51c3ed0940', pal:TRIM},
+  {key:'panel', label:'Panel Kontrol',          desc:'Plat kecil bertekstur di tengah dudukan', mat:'61bb72a4-3333-4651-a1ab-a2c8bf51b414', pal:SHELL},
+];
+const allPal = [...LEATHER, ...SHELL, ...TRIM];
+const nameOf = (hex, pal) => { if(!hex) return 'Warna asli'; const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase()); return f?f[0]:'Custom'; };
+
+const PRESETS3D = [
+  {name:'Executive Tan',  c:{body:'#b27b4c',shell:'#6e5440',frame:'#1d1e21',trim:'#6b4429',panel:'#3e4147'}},
+  {name:'Royal Burgundy', c:{body:'#6a1f2b',shell:'#1d1e21',frame:'#1d1e21',trim:'#c49e45',panel:'#1d1e21'}},
+  {name:'Ocean Navy',     c:{body:'#1f2c4c',shell:'#26324a',frame:'#26324a',trim:'#c9cdd2',panel:'#7c8188'}},
+  {name:'Sport Red',      c:{body:'#1b1c1f',shell:'#1d1e21',frame:'#1d1e21',trim:'#a3222a',panel:'#121315'}},
+  {name:'Ivory Luxe',     c:{body:'#e6dfd0',shell:'#e9e7e2',frame:'#e9e7e2',trim:'#9a6438',panel:'#b8a684'}},
+];
+
+const state = {c:{}, open:'body', studio:false};
+const matRefs = {}, origHex = {}, origEmissive = {};
+
+/* ---------- cahaya seleksi saat bagian dipilih ---------- */
+const FLASH_COLOR = new THREE.Color(0x3fbf4a);
+const flashAmt = {};
+function flashPart(key){ flashAmt[key] = 1; }
+function updateFlash(){
+  Object.keys(flashAmt).forEach(k => {
+    if (flashAmt[k] <= 0.001) {
+      if (flashAmt[k] !== 0) {
+        flashAmt[k] = 0;
+        (matRefs[k]||[]).forEach(m => m.emissive.copy(origEmissive[k]));
+      }
+      return;
+    }
+    flashAmt[k] *= 0.93;
+    (matRefs[k]||[]).forEach(m => m.emissive.copy(origEmissive[k]).lerp(FLASH_COLOR, flashAmt[k] * 0.4));
+  });
+}
+
+/* ---------- lepas bantalan / kaki (exploded view) ---------- */
+const DETACH = {
+  bantalan: {mat:'06c9f4b7-4175-47c2-86ee-b7986d3da2b7', dir:1,  label:'Bantalan',    meshes:[], material:null, progress:0, target:0},
+  kaki:     {mat:'2c86bf0b-2ff0-410b-9fb0-684e1c5fb106', dir:-1, label:'Kaki',         meshes:[], material:null, progress:0, target:0},
+};
+let DETACH_DIST = 0;
+
+function toggleDetach(key, btn){
+  const g = DETACH[key];
+  if (!g.meshes.length) return;
+  g.target = g.target ? 0 : 1;
+  btn.classList.toggle('active', !!g.target);
+  btn.textContent = (g.target ? 'Pasang ' : 'Lepas ') + g.label;
+}
+function updateDetach(){
+  Object.values(DETACH).forEach(g => {
+    if (!g.meshes.length) return;
+    g.progress += (g.target - g.progress) * 0.12;
+    if (Math.abs(g.target - g.progress) < 0.001) g.progress = g.target;
+    const offset = g.progress * DETACH_DIST * g.dir;
+    g.meshes.forEach(({mesh, origY}) => { mesh.position.y = origY + offset; });
+  });
+}
+
+function applyColor(key, hex){
+  state.c[key] = hex;
+  (matRefs[key]||[]).forEach(m => m.color.set(hex));
+  update();
+  toast(PARTS3D.find(p=>p.key===key).label+' diubah');
+}
+function resetPart(key){
+  delete state.c[key];
+  (matRefs[key]||[]).forEach(m => m.color.set('#'+origHex[key]));
+  update();
+}
+function resetAll(){
+  PARTS3D.forEach(p => resetPart(p.key));
+}
+
+const partsEl = document.getElementById('parts');
+function renderParts(){
+  partsEl.innerHTML = '';
+  PARTS3D.forEach(p => {
+    const hex = state.c[p.key];
+    const el = document.createElement('div'); el.className = 'part'+(state.open===p.key?' open':'');
+    el.innerHTML = `<button class="part-row"><span class="sw-big ${hex?'':'sw orig'}" style="${hex?'background:'+hex:''}"></span>
+      <span class="t"><b>${p.label}</b><small>${nameOf(hex,p.pal)}${hex?' · '+hex.toUpperCase():''}</small></span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
+      <div class="part-body"><p class="desc">${p.desc}</p><div class="grid"></div>
+      <label class="custom">Warna custom <input type="color" value="${hex||'#'+(origHex[p.key]||'808080')}"><input type="text" value="${(hex||'').toUpperCase()}" placeholder="#RRGGBB" maxlength="7"></label></div>`;
+    el.querySelector('.part-row').onclick = () => {
+      const opening = state.open !== p.key;
+      state.open = opening ? p.key : null;
+      renderParts();
+      if (opening) flashPart(p.key);
+    };
+    const grid = el.querySelector('.grid');
+    const ob = document.createElement('button'); ob.className = 'sw orig'+(!hex?' sel':''); ob.title = 'Warna asli'; ob.textContent = 'ASLI';
+    ob.onclick = () => { resetPart(p.key); }; grid.appendChild(ob);
+    p.pal.forEach(([n,h]) => { const b = document.createElement('button'); b.className = 'sw'+(hex===h?' sel':''); b.style.background = h; b.title = n;
+      b.onclick = () => applyColor(p.key, h); grid.appendChild(b); });
+    const [ci, ti] = el.querySelectorAll('.custom input');
+    ci.oninput = e => { applyColor(p.key, e.target.value.toLowerCase()); };
+    ti.onchange = e => { let v = e.target.value.trim(); if(v && !v.startsWith('#')) v = '#'+v; if(/^#[0-9a-f]{6}$/i.test(v)) applyColor(p.key, v.toLowerCase()); else e.target.value = (hex||'').toUpperCase(); };
+    partsEl.appendChild(el);
+  });
+}
+const presetsEl = document.getElementById('presets');
+function renderPresets(){
+  presetsEl.innerHTML = '';
+  PRESETS3D.forEach(pr => {
+    const b = document.createElement('button'); b.className = 'preset';
+    const dots = ['body','shell','panel','trim'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
+    b.innerHTML = `<span class="dots">${dots}</span>${pr.name}`;
+    b.onclick = () => { Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => m.color.set(h)); }); update(); toast(pr.name+' diterapkan'); };
+    presetsEl.appendChild(b);
+  });
+}
+function markPreset(){
+  [...presetsEl.children].forEach((b,i) => {
+    const pr = PRESETS3D[i].c;
+    b.classList.toggle('active', Object.keys(pr).every(k => pr[k]===state.c[k]));
+  });
+}
+function update(){ renderParts(); markPreset(); }
+
+function selectPart(key){
+  state.open = key;
+  update();
+  flashPart(key);
+  const el = partsEl.querySelector('.part.open');
+  if (el) el.scrollIntoView({behavior:'smooth', block:'nearest'});
+  toast(PARTS3D.find(p=>p.key===key).label+' dipilih · pilih warna di panel kanan');
+}
+
+/* ---------- klik langsung di model untuk pilih bagian ---------- */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let downPos = null;
+canvas.addEventListener('pointerdown', e => { downPos = {x:e.clientX, y:e.clientY}; if (panMode) canvas.style.cursor = 'grabbing'; });
+canvas.addEventListener('pointerup', e => {
+  const wasDown = downPos;
+  const dx = wasDown ? e.clientX - wasDown.x : 0, dy = wasDown ? e.clientY - wasDown.y : 0;
+  downPos = null;
+  if (panMode) { canvas.style.cursor = 'grab'; return; }
+  if (!model || !wasDown || Math.hypot(dx, dy) > 6) return;
+  const rect = canvas.getBoundingClientRect();
+  ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObject(model, true);
+  if (!hits.length) return;
+  const hit = hits[0];
+  const mats = Array.isArray(hit.object.material) ? hit.object.material : [hit.object.material];
+  const mat = (mats.length > 1 && hit.face) ? mats[hit.face.materialIndex] : mats[0];
+  const p = PARTS3D.find(pp => pp.mat === mat?.name);
+  if (p) selectPart(p.key);
+});
+
+const toastEl = document.getElementById('toast');
+let toastT = 0;
+function toast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(()=>toastEl.classList.remove('show'), 1600); }
+
+document.getElementById('btnResetColors').onclick = resetAll;
+document.getElementById('btnPng').onclick = () => {
+  renderer.render(scene, camera);
+  canvas.toBlob(blob => {
+    const a = document.createElement('a');
+    a.download = `alldila-kursi-3d-${Date.now()}.png`;
+    a.href = URL.createObjectURL(blob);
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }, 'image/png');
+  toast('Mengunduh PNG…');
+};
+
+let model = null, defaultCamPos = null, defaultTarget = null;
+const loader = new FBXLoader();
+loader.load('assets/kursipijat.fbx',
+  obj => {
+    model = obj;
+    model.traverse(n => { if (n.isMesh) { n.castShadow = false; n.receiveShadow = false; } });
+    scene.add(model);
+
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.sub(center);
+
+    const radius = Math.max(size.x, size.y, size.z) * 0.5 || 100;
+    const dist = radius / Math.sin((camera.fov * Math.PI/180) / 2) * 1.15;
+    camera.position.set(dist*0.55, dist*0.45, dist*0.75);
+    camera.near = radius/100; camera.far = radius*50;
+    camera.updateProjectionMatrix();
+    controls.target.set(0,0,0);
+    controls.update();
+    defaultCamPos = camera.position.clone();
+    defaultTarget = controls.target.clone();
+
+    layoutBus(size, center, box);
+
+    PARTS3D.forEach(p => matRefs[p.key] = []);
+    model.traverse(n => {
+      if (!n.isMesh) return;
+      const mats = Array.isArray(n.material) ? n.material : [n.material];
+      mats.forEach(m => {
+        const p = PARTS3D.find(pp => pp.mat === m.name);
+        if (!p) return;
+        matRefs[p.key].push(m);
+        if (origHex[p.key] === undefined) origHex[p.key] = m.color.getHexString();
+        if (origEmissive[p.key] === undefined) origEmissive[p.key] = m.emissive.clone();
+      });
+    });
+
+    DETACH_DIST = size.y * 0.75;
+    model.traverse(n => {
+      if (!n.isMesh) return;
+      const mats = Array.isArray(n.material) ? n.material : [n.material];
+      const g = Object.values(DETACH).find(gg => mats.some(m => m.name === gg.mat));
+      if (!g) return;
+      g.meshes.push({mesh:n, origY:n.position.y});
+    });
+
+    overlay.style.display = 'none';
+    renderParts();
+    renderPresets();
+  },
+  xhr => {
+    if (xhr.lengthComputable) {
+      const pct = Math.round(xhr.loaded/xhr.total*100);
+      progress.textContent = `Memuat model 3D… ${pct}%`;
+    }
+  },
+  err => {
+    progress.textContent = 'Gagal memuat model 3D.';
+    console.error(err);
+  }
+);
+
+let firstInteract = false;
+controls.addEventListener('start', () => { if(!firstInteract){ firstInteract = true; hint.classList.add('hide'); } });
+
+document.getElementById('btnReset').onclick = () => {
+  if(!defaultCamPos) return;
+  camera.position.copy(defaultCamPos);
+  controls.target.copy(defaultTarget);
+  controls.update();
+};
+document.getElementById('btnFull').onclick = () => {
+  document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+};
+document.getElementById('btnDetachBody').onclick = e => toggleDetach('bantalan', e.target);
+document.getElementById('btnDetachLegs').onclick = e => toggleDetach('kaki', e.target);
+document.getElementById('btnStudio').onclick = e => { setStudio(!state.studio); e.currentTarget.classList.toggle('active', state.studio); };
+document.getElementById('btnPan').onclick = e => { setPanMode(!panMode); e.currentTarget.classList.toggle('active', panMode); };
+
+(function loop(){
+  requestAnimationFrame(loop);
+  controls.update();
+  updateDetach();
+  updateFlash();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>

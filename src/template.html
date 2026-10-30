@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulator Warna Jok</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1114; --panel:#171a1f; --panel-2:#1e2228; --line:#2a2f37;
+    --text:#eef0f3; --muted:#9097a1; --brand:#3fbf4a; --brand-2:#2c9d36;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  button,input{font:inherit;color:inherit}
+  .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100vh}
+  .stage{position:relative;display:flex;flex-direction:column;background:radial-gradient(ellipse 70% 60% at 50% 45%,#232830,#0f1114);overflow:hidden;min-width:0}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 24px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:10px}
+  .brand b{font-size:22px;font-weight:800;font-style:italic;color:var(--brand);letter-spacing:-.5px}
+  .brand span{font-size:12px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
+  .top-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .chip-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;transition:.15s;user-select:none;-webkit-user-select:none}
+  .chip-btn:hover{background:rgba(255,255,255,.12)}
+  .chip-btn.on{background:rgba(63,191,74,.15);border-color:var(--brand)}
+  .view{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 24px;position:relative}
+  .frame{position:relative;height:100%;max-height:calc(100vh - 170px);aspect-ratio:3/4;max-width:100%}
+  .frame canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:14px}
+  #view{box-shadow:0 30px 60px rgba(0,0,0,.45);cursor:pointer}
+  #flash{pointer-events:none;transition:opacity .35s}
+  .loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
+  .badge{position:absolute;left:12px;top:12px;background:rgba(0,0,0,.6);border-radius:8px;padding:5px 10px;font-size:12px;display:none}
+  .badge.show{display:block}
+  .presets{display:flex;gap:10px;padding:12px 24px 20px;overflow-x:auto;scrollbar-width:thin}
+  .preset{flex:0 0 auto;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:8px 14px 8px 8px;cursor:pointer;transition:.15s;font-size:13px;font-weight:600}
+  .preset:hover{background:rgba(255,255,255,.1)}
+  .preset.active{border-color:var(--brand);background:rgba(63,191,74,.12)}
+  .preset .dots{display:flex}
+  .preset .dots i{width:18px;height:18px;border-radius:50%;border:2px solid #1b1e23;margin-left:-6px}
+  .preset .dots i:first-child{margin-left:0}
+  .panel{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .panel-head{padding:20px 22px 12px}
+  .panel-head h1{font-size:18px;margin:0 0 4px}
+  .panel-head p{margin:0;color:var(--muted);font-size:13px}
+  .panel-body{flex:1;overflow-y:auto;padding:6px 14px 14px}
+  .part{border:1px solid transparent;border-radius:14px;margin-bottom:6px;transition:.15s}
+  .part.open{background:var(--panel-2);border-color:var(--line)}
+  .part-row{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;padding:10px;cursor:pointer;text-align:left;border-radius:14px}
+  .part-row:hover{background:rgba(255,255,255,.04)}
+  .sw-big{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.15);flex:0 0 auto;box-shadow:inset 0 -6px 10px rgba(0,0,0,.25)}
+  .part-row .t{flex:1;min-width:0}
+  .part-row .t b{display:block;font-size:14px}
+  .part-row .t small{color:var(--muted);font-size:12px}
+  .part-row .chev{color:var(--muted);transition:.2s}
+  .part.open .chev{transform:rotate(180deg)}
+  .part-body{display:none;padding:2px 12px 14px}
+  .part.open .part-body{display:block}
+  .desc{color:var(--muted);font-size:12px;margin:0 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:7px}
+  .sw{aspect-ratio:1;border-radius:9px;border:1px solid rgba(255,255,255,.15);cursor:pointer;padding:0;transition:transform .1s}
+  .sw:hover{transform:scale(1.08)}
+  .sw.sel{outline:2px solid var(--brand);outline-offset:2px}
+  .sw.orig{background:repeating-linear-gradient(135deg,#3a3f46 0 4px,#23272d 4px 8px)!important;font-size:9px;font-weight:700;color:#cfd3d6}
+  .custom{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
+  .custom input[type=color]{width:34px;height:28px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px;cursor:pointer}
+  .custom input[type=text]{width:90px;background:#111418;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  .seg{display:flex;background:#111418;border:1px solid var(--line);border-radius:10px;padding:3px}
+  .seg button{background:none;border:0;padding:5px 10px;border-radius:7px;font-size:12px;cursor:pointer;color:var(--muted)}
+  .seg button.on{background:var(--panel-2);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.06)}
+  .opt{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:13px}
+  .pat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .pat{background:#111418;border:1px solid var(--line);border-radius:10px;padding:6px 4px 5px;cursor:pointer;color:#c3c8cf;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;line-height:1.15;text-align:center}
+  .pat svg{width:34px;height:34px;overflow:hidden;border-radius:6px;background:#1b1f25}
+  .pat:hover{border-color:#3a414b}
+  .pat.on{border-color:var(--brand);color:var(--text);background:rgba(63,191,74,.08)}
+  .part-row .ico{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.15);display:grid;place-items:center;color:#c3c8cf;background:#111418;flex:0 0 auto}
+  .part-row .ico svg{width:24px;height:24px}
+  .panel-foot{border-top:1px solid var(--line);padding:14px 18px 18px;display:grid;gap:10px}
+  .panel-foot input{width:100%;background:#111418;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--panel-2);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn:hover{background:#262b33}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#06200a}
+  .btn.primary:hover{background:var(--brand-2)}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#222;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:20}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  @media (max-width:900px){
+    .app{grid-template-columns:1fr;height:auto}
+    .stage{min-height:80vh}
+    .frame{max-height:68vh}
+    .panel{border-left:0;border-top:1px solid var(--line)}
+    .topbar{padding:14px 16px}.presets{padding:12px 16px 16px}.view{padding:0 16px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="stage">
+    <div class="topbar">
+      <div class="brand"><b>Alldila</b><span>Seats · Color Studio</span></div>
+      <div class="top-actions">
+        <button class="chip-btn" id="btnHold" title="Tahan untuk melihat foto asli">Tahan: lihat asli</button>
+        <button class="chip-btn" id="btnBg">Latar studio</button>
+        <button class="chip-btn" id="btnFull">Layar penuh</button>
+      </div>
+    </div>
+    <div class="view">
+      <div class="frame">
+        <canvas id="view" width="1080" height="1440"></canvas>
+        <canvas id="flash" width="1080" height="1440" style="opacity:0"></canvas>
+        <div class="loading" id="loading">Memuat foto…</div>
+        <div class="badge" id="badge">Foto asli</div>
+      </div>
+    </div>
+    <div class="presets" id="presets"></div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <h1>Kustomisasi Warna</h1>
+      <p>Klik bagian kursi di foto, atau pilih elemen di bawah.</p>
+    </div>
+    <div class="panel-body" id="parts"></div>
+    <div class="panel-foot">
+      <input id="project" placeholder="Nama klien / proyek (opsional)">
+      <div class="btns">
+        <button class="btn" id="btnReset">Kembali ke asli</button>
+        <button class="btn primary" id="btnPng">Unduh PNG</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);text-align:center">Lihat demo multi-sudut (dummy) <a href="dummy-kursi-gaming.html" style="color:var(--muted)">→</a></div>
+    </div>
+  </aside>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SRC = {photo:'__PHOTO__', a:'__PA__', b:'__PB__', c:'__PC__', l:'__PL__', f:'__PF__', d:'__PD__'};
+
+const LEATHER = [['Onyx Black','#1b1c1f'],['Graphite','#2c3036'],['Charcoal','#3a3e44'],['Slate Grey','#4f555d'],['Silver Grey','#8a9097'],['Ivory','#e6dfd0'],['Pearl White','#f1efea'],['Cream','#d9c8a8'],
+  ['Tan','#b27b4c'],['Cognac','#8b4a22'],['Mocha','#5a3e30'],['Espresso','#3c2a21'],['Burgundy','#6a1f2b'],['Racing Red','#a3222a'],['Navy','#1f2c4c'],['Ocean Blue','#2f5a7e'],
+  ['Midnight','#1a2238'],['Olive','#555b3a'],['Forest','#28463a'],['Camel','#c19a6b'],['Sand','#cbb994'],['Plum','#4c2a3e'],['Teal','#1f5557'],['Orange','#c45a1c']];
+const THREAD = [['Putih','#f3f3f0'],['Silver','#c9cdd1'],['Abu Tua','#5c6168'],['Hitam','#141414'],['Krem','#e4d3ac'],['Emas','#d1a640'],['Oranye','#e8792d'],['Merah','#d02a2a'],
+  ['Maroon','#8a2433'],['Biru','#3577c4'],['Navy','#2a3a6a'],['Hijau','#3fa954'],['Kuning','#ecc72e'],['Tan','#b9824f'],['Coklat','#6b4429'],['Pink','#e06c96']];
+const SHELL = [['Gunmetal','#3e4147'],['Matte Black','#1d1e21'],['Titanium','#7c8188'],['Silver','#b9bdc2'],['Champagne','#b8a684'],['Pearl White','#e9e7e2'],['Bronze','#6e5440'],['Navy Metallic','#26324a']];
+const TRIM = [['Walnut','#6b4429'],['Teak','#9a6438'],['Ebony','#2a2420'],['Maple','#c49a63'],['Chrome','#c9cdd2'],['Carbon','#2a2c30'],['Rose Gold','#c08c78'],['Gold','#c49e45'],['Piano Black','#121315'],['Silver','#a7acb2']];
+const LOGO = [['Hijau Alldila','#3fbf4a'],...THREAD.filter(t=>t[0]!=='Hijau')];
+
+// mask: [pack, channel]  channels R=0 G=1 B=2
+const PARTS = [
+  {key:'main',   label:'Kulit Utama',      desc:'Headrest, bolster luar, sisi jok & footrest', pal:LEATHER, m:['a',0], k:.8},
+  {key:'insert', label:'Panel Tengah',     desc:'Panel quilting tengah sandaran, dudukan, footrest', pal:LEATHER, m:['a',1], k:.8},
+  {key:'side',   label:'Panel Samping',    desc:'Panel di dalam lengkungan strip aksen', pal:LEATHER, m:['a',2], k:.8},
+  {key:'accent', label:'Aksen / Strip',    desc:'Strip lengkung (aslinya putih)', pal:LEATHER, m:['b',0], k:1},
+  {key:'stitch', label:'Benang Jahitan',   desc:'Semua jahitan & quilting', pal:THREAD, m:['b',1], k:.9},
+  {key:'shell',  label:'Cangkang Armrest', desc:'Body armrest kiri & kanan', pal:SHELL, m:['c',0], k:.85},
+  {key:'trim',   label:'Trim Armrest',     desc:'Panel motif kayu di atas armrest', pal:TRIM, m:['c',1], k:.9},
+  {key:'logo',   label:'Bordir Logo',      desc:'Logo Alldila di headrest', pal:LOGO, m:['b',2], k:.9},
+];
+const ORDER = ['main','insert','side','shell','trim','accent','logo','stitch'];
+
+const PRESETS = [
+  {name:'Foto Asli',      c:{}},
+  {name:'Executive Tan',  c:{main:'#5a3e30',insert:'#3c2a21',side:'#3c2a21',accent:'#c19a6b',stitch:'#e4d3ac',shell:'#6e5440',trim:'#6b4429',logo:'#d1a640'}},
+  {name:'Royal Burgundy', c:{main:'#1b1c1f',insert:'#6a1f2b',side:'#6a1f2b',accent:'#e6dfd0',stitch:'#d1a640',shell:'#1d1e21',trim:'#c49e45',logo:'#d1a640'}},
+  {name:'Ocean Navy',     c:{main:'#1f2c4c',insert:'#1a2238',side:'#1a2238',accent:'#f1efea',stitch:'#e8792d',shell:'#26324a',trim:'#c9cdd2',logo:'#f3f3f0'}},
+  {name:'Sport Red',      c:{main:'#1b1c1f',insert:'#1b1c1f',side:'#1b1c1f',accent:'#a3222a',stitch:'#d02a2a',shell:'#1d1e21',trim:'#2a2c30',logo:'#d02a2a'}},
+  {name:'Ivory Luxe',     c:{main:'#e6dfd0',insert:'#d9c8a8',side:'#d9c8a8',accent:'#5a3e30',stitch:'#8b4a22',shell:'#e9e7e2',trim:'#9a6438',logo:'#5a3e30'}},
+  {name:'Two-Tone Grey',  c:{main:'#2c3036',insert:'#8a9097',side:'#4f555d',accent:'#1b1c1f',stitch:'#f3f3f0',trim:'#a7acb2'}},
+  {name:'Forest Camel',   c:{main:'#28463a',insert:'#c19a6b',side:'#28463a',accent:'#e6dfd0',stitch:'#e4d3ac',trim:'#6b4429',logo:'#e4d3ac'}},
+];
+
+const PATTERNS=[['asli','Asli (foto)'],['diamond','Diamond'],['kotak','Kotak'],['hexagon','Honeycomb'],['horizontal','Garis Horizontal'],['vertikal','Garis Vertikal'],['chevron','Chevron']];
+const PAT_ICON={
+  asli:'<rect x="6" y="6" width="28" height="28" rx="4" fill="none" stroke="currentColor" stroke-dasharray="3 2"/><text x="20" y="24" font-size="9" text-anchor="middle" fill="currentColor" font-weight="700">ASLI</text>',
+  diamond:'<path d="M0 8L20 20L40 8M0 20L20 32L40 20M0 32L8 37M40 32L32 37M0 8L20 -4L40 8M0 20L20 8L40 20M0 32L20 20L40 32" fill="none" stroke="currentColor"/>',
+  kotak:'<path d="M0 10H40M0 20H40M0 30H40M10 0V40M20 0V40M30 0V40" fill="none" stroke="currentColor"/>',
+  hexagon:'<path d="M10 4l8 4.6v9.2l-8 4.6-8-4.6V8.6zM26 4l8 4.6v9.2l-8 4.6-8-4.6V8.6zM18 18l8 4.6v9.2l-8 4.6-8-4.6v-9.2z" fill="none" stroke="currentColor"/>',
+  horizontal:'<path d="M0 8H40M0 16H40M0 24H40M0 32H40" fill="none" stroke="currentColor"/>',
+  vertikal:'<path d="M8 0V40M16 0V40M24 0V40M32 0V40" fill="none" stroke="currentColor"/>',
+  chevron:'<path d="M0 4L20 14L40 4M0 14L20 24L40 14M0 24L20 34L40 24M0 34L20 44L40 34" fill="none" stroke="currentColor"/>',
+};
+const SIZES={kecil:22,sedang:30,besar:40};
+const state = {c:{}, open:'main', studio:false, hold:false, pat:{type:'asli',style:'double',size:'sedang',area:'insert'}};
+const W=1080, H=1440, N=W*H;
+const view=document.getElementById('view'), vctx=view.getContext('2d');
+const flash=document.getElementById('flash'), fctx=flash.getContext('2d');
+let ORIG, LUM, LUMB, LUMF, DIST, PATI, PATS, MASK={}, LREF={}, ORIGCOL={}, CHAIR, IDX, BG, OUT;
+
+function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src;});}
+function pixels(img){const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.drawImage(img,0,0,W,H);return x.getImageData(0,0,W,H).data;}
+const hex2rgb=h=>[parseInt(h.slice(1,3),16)/255,parseInt(h.slice(3,5),16)/255,parseInt(h.slice(5,7),16)/255];
+const lum=([r,g,b])=>.299*r+.587*g+.114*b;
+
+async function init(){
+  const [p,a,b,c,l,f,d]=await Promise.all([SRC.photo,SRC.a,SRC.b,SRC.c,SRC.l,SRC.f,SRC.d].map(loadImg));
+  ORIG=pixels(p); const A=pixels(a),B=pixels(b),C=pixels(c),LB=pixels(l),LF=pixels(f),DS=pixels(d);
+  const packs={a:A,b:B,c:C};
+  LUM=new Float32Array(N); LUMB=new Float32Array(N); LUMF=new Float32Array(N); DIST=new Float32Array(N); PATI=new Uint8Array(N); PATS=new Uint8Array(N);
+  // LUMB = luminance with the stitches painted out, so leather under/around threads recolors cleanly
+  // LUMF = LUMB with the old quilting grooves smoothed away (canvas for a new stitch pattern)
+  // DIST = distance in px to the edge of the pattern area (stored x4); PATI/PATS = smoothed pattern areas
+  for(let i=0;i<N;i++){const j=i*4;LUM[i]=(.299*ORIG[j]+.587*ORIG[j+1]+.114*ORIG[j+2])/255;LUMB[i]=LB[j]/255;LUMF[i]=LF[j]/255;DIST[i]=DS[j]/4;PATI[i]=DS[j+1];PATS[i]=DS[j+2];}
+  PARTS.forEach(pt=>{const src=packs[pt.m[0]],ch=pt.m[1];const m=new Uint8Array(N);let s=0,w=0,cr=0,cg=0,cb=0;
+    const Lsrc=pt.key==='stitch'?LUM:LUMB;
+    for(let i=0;i<N;i++){const v=src[i*4+ch];m[i]=v;if(v>200){s+=Lsrc[i];w++;cr+=ORIG[i*4];cg+=ORIG[i*4+1];cb+=ORIG[i*4+2];}}
+    MASK[pt.key]=m; LREF[pt.key]=w?s/w:.3; ORIGCOL[pt.key]=w?[cr/w/255,cg/w/255,cb/w/255]:[.5,.5,.5];});
+  CHAIR=new Uint8Array(N); const list=[];
+  for(let i=0;i<N;i++){const v=C[i*4+2];CHAIR[i]=v;if(v>0)list.push(i);}
+  IDX=Uint32Array.from(list);
+  // studio background (gradient + soft floor shadow)
+  const bc=document.createElement('canvas');bc.width=W;bc.height=H;const bx=bc.getContext('2d');
+  const g=bx.createRadialGradient(W/2,H*.42,60,W/2,H*.5,H*.75);g.addColorStop(0,'#3a3f47');g.addColorStop(1,'#14171b');
+  bx.fillStyle=g;bx.fillRect(0,0,W,H);
+  bx.save();bx.translate(590,1385);bx.scale(330,38);const sg=bx.createRadialGradient(0,0,0,0,0,1);sg.addColorStop(0,'rgba(0,0,0,.6)');sg.addColorStop(1,'rgba(0,0,0,0)');bx.fillStyle=sg;bx.beginPath();bx.arc(0,0,1,0,7);bx.fill();bx.restore();
+  bx.save();bx.translate(545,1000);bx.scale(360,40);bx.fillStyle=sg;bx.beginPath();bx.arc(0,0,1,0,7);bx.fill();bx.restore();
+  BG=bx.getImageData(0,0,W,H).data;
+  OUT=vctx.createImageData(W,H);
+  document.getElementById('loading').remove();
+  render();
+}
+
+/* ---------- procedural quilting ---------- */
+const DASH=5.5, DUTY=.56, TW=.8;   // stitch length (px), share of thread vs gap, thread half-width
+const sat=x=>x<0?0:x>1?1:x;
+const smooth=(a,b,x)=>{const t=sat((x-a)/(b-a));return t*t*(3-2*t);};
+function dashA(t){const ph=((t/DASH)%1+1)%1;return sat(Math.min(ph,DUTY-ph)*DASH/.6+.5);}
+// distance to the nearest pattern line (px) and position along that line, in pattern space (u,v)
+const PQ={d:0,t:0};
+function lineFam(u,v,nx,ny,S){const a=(u*nx+v*ny)/S;const f=a-Math.round(a);const d=Math.abs(f)*S;if(d<PQ.d){PQ.d=d;PQ.t=-u*ny+v*nx;}}
+const DN=[-.53,.848], HEXN=[[1,0],[.5,.866],[-.5,.866]];
+function patternAt(type,u,v,S){
+  PQ.d=1e9;PQ.t=0;
+  if(type==='diamond'){lineFam(u,v,DN[0],DN[1],S);lineFam(u,v,-DN[0],DN[1],S);}
+  else if(type==='kotak'){lineFam(u,v,1,0,S);lineFam(u,v,0,1,S);}
+  else if(type==='horizontal'){lineFam(u,v,0,1,S*.7);}
+  else if(type==='vertikal'){lineFam(u,v,1,0,S*.6);}
+  else if(type==='chevron'){const k=.55,a=(v+Math.abs(u)*k)/S,f=a-Math.round(a);PQ.d=Math.abs(f)*S/Math.hypot(1,k);PQ.t=u*1.14;}
+  else if(type==='hexagon'){
+    const R=S*.62, q=(.57735*u-v/3)/R, r=(2/3*v)/R, cs=-q-r;
+    let rq=Math.round(q),rr=Math.round(r),rs=Math.round(cs);
+    const dq=Math.abs(rq-q),dr=Math.abs(rr-r),ds=Math.abs(rs-cs);
+    if(dq>dr&&dq>ds)rq=-rr-rs;else if(dr>ds)rr=-rq-rs;
+    const lx=u-R*1.732*(rq+rr/2), ly=v-R*1.5*rr;
+    let best=-1,bk=0;for(let k=0;k<3;k++){const p=Math.abs(lx*HEXN[k][0]+ly*HEXN[k][1]);if(p>best){best=p;bk=k;}}
+    PQ.d=Math.abs(R*.866-best);PQ.t=-lx*HEXN[bk][1]+ly*HEXN[bk][0];
+  }
+}
+// map image coords to pattern space per zone (seat is seen at an angle, so stretch it)
+function zoneUV(x,y){
+  if(y<705) return [x-530,y];
+  if(y<955) return [x-538,705+(y-705)/.6];
+  return [x-548,y];
+}
+
+function render(){
+  const o=OUT.data, studio=state.studio, hold=state.hold, P=state.pat;
+  const patOn=!hold&&P.type!=='asli';
+  if(studio){for(let i=0;i<N*4;i+=4){o[i]=BG[i];o[i+1]=BG[i+1];o[i+2]=BG[i+2];o[i+3]=255;}}
+  else{o.set(ORIG);}
+  const forced=patOn?(P.area==='both'?['insert','side']:['insert']):[];
+  const active=hold?[]:ORDER.filter(k=>state.c[k]||forced.includes(k)).map(k=>{
+    const t=state.c[k]?hex2rgb(state.c[k]):ORIGCOL[k];const pt=PARTS.find(p=>p.key===k);const lt=lum(t),lr=LREF[k];
+    // soften contrast when going much lighter than the original material
+    const kk=pt.k-.35*Math.max(0,lt-lr)/.7;
+    return {k,m:MASK[k],t,lr,kk,hl:.25,L:k==='stitch'?LUM:LUMB,pat:forced.includes(k),stitch:k==='stitch'};});
+  const mI=PATI, mS=PATS, both=P.area==='both', S=SIZES[P.size], dbl=P.style==='double';
+  const off=dbl?2.4:0, gw=dbl?2.3:1.6;
+  const Ts=state.c.stitch?hex2rgb(state.c.stitch):ORIGCOL.stitch, lrP=LREF.insert;
+  for(let n=0;n<IDX.length;n++){
+    const i=IDX[n], j=i*4;
+    let r=ORIG[j]/255,g=ORIG[j+1]/255,b=ORIG[j+2]/255;
+    // new quilting pattern on the selected panels
+    let pm=0,Lp=0,Lt=0,ta=0;
+    if(patOn){pm=both?Math.max(mI[i],mS[i]):mI[i];
+      if(pm){const x=i%W,y=(i-x)/W, de=DIST[i];
+        const [u,v]=zoneUV(x,y); patternAt(P.type,u,v,S);
+        const fade=smooth(6,11,de);                    // keep the pattern off the panel border
+        const d=PQ.d, t0=PQ.t;
+        // light from above: the cell surface just below a seam faces up (lighter), just above it faces down
+        patternAt(P.type,u,v+1.2,S); const sl=Math.max(-1,Math.min(1,(PQ.d-d)/1.2));
+        const groove=1-.5*Math.exp(-(d/gw)*(d/gw))*fade;
+        const relief=1+fade*(.2*sl*Math.exp(-d/(S*.22))-.05+.08*smooth(0,S*.45,d));
+        const edge=1-.3*Math.exp(-(de/2.2)*(de/2.2));
+        Lt=LUMF[i]*relief*edge; Lp=Lt*groove;   // threads sit on top of the groove, so they skip its shadow
+        ta=sat(1-Math.abs(d-off)/TW)*dashA(t0)*fade;
+        // outline stitch following the panel border
+        const gx=DIST[i+1]-DIST[i-1], gy=DIST[i+W]-DIST[i-W], gl=Math.hypot(gx,gy)||1;
+        const te=(-gy*x+gx*y)/gl, eo=dbl?[4,7.5]:[5];
+        for(const e of eo) ta=Math.max(ta,sat(1-Math.abs(de-e)/TW)*dashA(te));
+      }}
+    for(let q=0;q<active.length;q++){const A=active[q];let mv=A.m[i];
+      if(patOn){ // the pattern area takes over from the original panel layout
+        if(A.k==='insert')mv=Math.max(mv,mI[i]);
+        else if(A.k==='side')mv=both?Math.max(mv*(1-mI[i]/255),mS[i]):mv*(1-mI[i]/255);
+        else if(A.stitch&&pm)mv*=1-pm/255;}
+      if(mv<1)continue;const m=mv/255;
+      let s=(A.pat&&pm?Lp:A.L[i])/A.lr; s=Math.pow(s,A.kk);
+      let cr=A.t[0]*s,cg=A.t[1]*s,cb=A.t[2]*s;
+      if(s>1){const e=(s-1)*A.hl;cr+=(1-A.t[0])*e;cg+=(1-A.t[1])*e;cb+=(1-A.t[2])*e;}
+      r+= (Math.min(1,cr)-r)*m; g+=(Math.min(1,cg)-g)*m; b+=(Math.min(1,cb)-b)*m;}
+    if(ta>0){const a=ta*pm/255, sh=Math.pow(Lt/lrP,.35);
+      r+=(Math.min(1,Ts[0]*sh)-r)*a; g+=(Math.min(1,Ts[1]*sh)-g)*a; b+=(Math.min(1,Ts[2]*sh)-b)*a;}
+    if(studio){const a=CHAIR[i]/255;o[j]=BG[j]+(r*255-BG[j])*a;o[j+1]=BG[j+1]+(g*255-BG[j+1])*a;o[j+2]=BG[j+2]+(b*255-BG[j+2])*a;}
+    else{o[j]=r*255;o[j+1]=g*255;o[j+2]=b*255;}
+  }
+  vctx.putImageData(OUT,0,0);
+}
+let raf=0;function schedule(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;render();});}
+
+/* ---------- panel ---------- */
+const allPal=[...LEATHER,...THREAD,...SHELL,...TRIM,...LOGO];
+const nameOf=(hex,pal)=>{if(!hex)return 'Warna asli';const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase());return f?f[0]:'Custom';};
+const partsEl=document.getElementById('parts');
+function renderParts(){
+  partsEl.innerHTML='';
+  PARTS.forEach(p=>{
+    const hex=state.c[p.key];
+    const el=document.createElement('div');el.className='part'+(state.open===p.key?' open':'');
+    el.innerHTML=`<button class="part-row"><span class="sw-big ${hex?'':'sw orig'}" style="${hex?'background:'+hex:''}"></span>
+      <span class="t"><b>${p.label}</b><small>${nameOf(hex,p.pal)}${hex?' · '+hex.toUpperCase():''}</small></span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
+      <div class="part-body"><p class="desc">${p.desc}</p><div class="grid"></div>
+      <label class="custom">Warna custom <input type="color" value="${hex||'#808080'}"><input type="text" value="${(hex||'').toUpperCase()}" placeholder="#RRGGBB" maxlength="7"></label></div>`;
+    el.querySelector('.part-row').onclick=()=>{state.open=state.open===p.key?null:p.key;renderParts();if(state.open)flashPart(p.key);};
+    const grid=el.querySelector('.grid');
+    const ob=document.createElement('button');ob.className='sw orig'+(!hex?' sel':'');ob.title='Warna asli';ob.textContent='ASLI';
+    ob.onclick=()=>{delete state.c[p.key];update();};grid.appendChild(ob);
+    p.pal.forEach(([n,h])=>{const b=document.createElement('button');b.className='sw'+(hex===h?' sel':'');b.style.background=h;b.title=n;
+      b.onclick=()=>{state.c[p.key]=h;update();};grid.appendChild(b);});
+    const [ci,ti]=el.querySelectorAll('.custom input');
+    ci.oninput=e=>{state.c[p.key]=e.target.value.toLowerCase();ti.value=e.target.value.toUpperCase();el.querySelector('.sw-big').className='sw-big';el.querySelector('.sw-big').style.background=e.target.value;schedule();};
+    ci.onchange=()=>update();
+    ti.onchange=e=>{let v=e.target.value.trim();if(v&&!v.startsWith('#'))v='#'+v;if(/^#[0-9a-f]{6}$/i.test(v)){state.c[p.key]=v.toLowerCase();update();}else e.target.value=(hex||'').toUpperCase();};
+    partsEl.appendChild(el);
+    if(p.key==='stitch') partsEl.appendChild(patternCard());
+  });
+}
+function patternCard(){
+  const P=state.pat, el=document.createElement('div'); el.className='part'+(state.open==='pattern'?' open':'');
+  const ic=k=>`<svg viewBox="0 0 40 40">${PAT_ICON[k]}</svg>`;
+  const seg=(o,opts)=>`<div class="seg" data-o="${o}">${opts.map(([v,l])=>`<button data-v="${v}" class="${P[o]===v?'on':''}">${l}</button>`).join('')}</div>`;
+  const name=PATTERNS.find(x=>x[0]===P.type)[1];
+  el.innerHTML=`<button class="part-row"><span class="ico">${ic(P.type)}</span>
+      <span class="t"><b>Pola Jahitan</b><small>${name}${P.type!=='asli'?' · '+(P.style==='double'?'Double':'Single')+' · '+P.size:''}</small></span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
+    <div class="part-body"><p class="desc">Pola quilting di panel tengah. Warna benang mengikuti "Benang Jahitan".</p>
+      <div class="pat-grid">${PATTERNS.map(([k,l])=>`<button class="pat ${P.type===k?'on':''}" data-k="${k}">${ic(k)}${l}</button>`).join('')}</div>
+      <div class="opt">Model benang ${seg('style',[['single','Single'],['double','Double']])}</div>
+      <div class="opt">Ukuran pola ${seg('size',[['kecil','Kecil'],['sedang','Sedang'],['besar','Besar']])}</div>
+      <div class="opt">Area ${seg('area',[['insert','Panel Tengah'],['both','+ Samping']])}</div>
+    </div>`;
+  el.querySelector('.part-row').onclick=()=>{state.open=state.open==='pattern'?null:'pattern';renderParts();if(state.open)flashPart(P.area==='both'?'side':'insert');};
+  el.querySelectorAll('.pat').forEach(b=>b.onclick=()=>{P.type=b.dataset.k;update();});
+  el.querySelectorAll('.seg').forEach(sg=>sg.onclick=e=>{const v=e.target.dataset.v;if(v==null)return;P[sg.dataset.o]=v;update();});
+  return el;
+}
+function update(){renderParts();markPreset();schedule();}
+
+/* ---------- presets ---------- */
+const presetsEl=document.getElementById('presets');
+PRESETS.forEach(pr=>{const b=document.createElement('button');b.className='preset';
+  const dots=['main','insert','accent','stitch'].map(k=>pr.c[k]?`<i style="background:${pr.c[k]}"></i>`:`<i class="sw orig" style="border-radius:50%"></i>`).join('');
+  b.innerHTML=`<span class="dots">${dots}</span>${pr.name}`;
+  b.onclick=()=>{state.c={...pr.c};update();};presetsEl.appendChild(b);});
+function markPreset(){[...presetsEl.children].forEach((b,i)=>{const pr=PRESETS[i].c;const keys=new Set([...Object.keys(pr),...Object.keys(state.c)]);
+  b.classList.toggle('active',[...keys].every(k=>pr[k]===state.c[k]));});}
+
+/* ---------- click on photo ---------- */
+function flashPart(key){
+  if(!MASK[key])return;const m=MASK[key];const img=fctx.createImageData(W,H),d=img.data;
+  for(let i=0;i<N;i++){const v=m[i];if(v){const j=i*4;d[j]=63;d[j+1]=191;d[j+2]=74;d[j+3]=v*.55;}}
+  fctx.putImageData(img,0,0);flash.style.transition='none';flash.style.opacity=1;
+  requestAnimationFrame(()=>{flash.style.transition='opacity .6s .25s';flash.style.opacity=0;});
+}
+view.addEventListener('click',e=>{
+  if(!IDX)return;const r=view.getBoundingClientRect();
+  const x=Math.floor((e.clientX-r.left)/r.width*W),y=Math.floor((e.clientY-r.top)/r.height*H);
+  // pick the strongest mask in a small neighbourhood (stitches are thin)
+  let best=null,bv=0;
+  for(const p of PARTS){let v=0;for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;
+      const c=p.key==='stitch'?MASK[p.key][yy*W+xx]*.6:(dx===0&&dy===0?MASK[p.key][yy*W+xx]:0);if(c>v)v=c;}
+    if(v>bv){bv=v;best=p.key;}}
+  if(!best||bv<60)return;
+  state.open=best;renderParts();flashPart(best);
+  const open=partsEl.querySelector('.part.open');open&&open.scrollIntoView({behavior:'smooth',block:'nearest'});
+  toast(PARTS.find(p=>p.key===best).label+' dipilih');
+});
+
+/* ---------- buttons ---------- */
+let tt;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1400);}
+document.getElementById('btnReset').onclick=()=>{state.c={};state.pat={type:'asli',style:'double',size:'sedang',area:'insert'};update();};
+const hold=document.getElementById('btnHold'),badge=document.getElementById('badge');
+const setHold=v=>{if(state.hold===v)return;state.hold=v;badge.classList.toggle('show',v);schedule();};
+hold.addEventListener('pointerdown',()=>setHold(true));
+['pointerup','pointerleave','pointercancel'].forEach(ev=>hold.addEventListener(ev,()=>setHold(false)));
+document.getElementById('btnBg').onclick=e=>{state.studio=!state.studio;e.currentTarget.classList.toggle('on',state.studio);schedule();};
+document.getElementById('btnFull').onclick=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen?.();};
+
+/* ---------- export PNG + spec sheet ---------- */
+document.getElementById('btnPng').onclick=()=>{
+  const wasHold=state.hold;state.hold=false;render();
+  const CW=1080+520,cv=document.createElement('canvas');cv.width=CW;cv.height=H;const x=cv.getContext('2d');
+  x.drawImage(view,0,0);
+  x.fillStyle='#171a1f';x.fillRect(1080,0,520,H);
+  const F='"Plus Jakarta Sans",system-ui,sans-serif';
+  x.fillStyle='#3fbf4a';x.font=`italic 800 44px ${F}`;x.fillText('Alldila',1130,110);
+  x.fillStyle='#9097a1';x.font=`600 18px ${F}`;x.fillText('SEATS · SPESIFIKASI WARNA',1130,145);
+  const proj=document.getElementById('project').value.trim();
+  x.fillStyle='#eef0f3';x.font=`700 26px ${F}`;x.fillText(proj||'Konfigurasi Custom',1130,215);
+  x.fillStyle='#9097a1';x.font=`500 17px ${F}`;x.fillText(new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}),1130,245);
+  let y=300;
+  PARTS.forEach(p=>{const h=state.c[p.key];
+    if(h){x.fillStyle=h;}else{const pg=x.createLinearGradient(1130,y,1186,y+56);pg.addColorStop(0,'#3a3f46');pg.addColorStop(1,'#23272d');x.fillStyle=pg;}
+    x.beginPath();x.roundRect(1130,y,56,56,12);x.fill();x.strokeStyle='rgba(255,255,255,.18)';x.lineWidth=2;x.stroke();
+    x.fillStyle='#eef0f3';x.font=`700 21px ${F}`;x.fillText(p.label,1206,y+24);
+    x.fillStyle='#9097a1';x.font=`500 17px ${F}`;x.fillText(h?`${nameOf(h,p.pal)} · ${h.toUpperCase()}`:'Warna asli (sesuai foto)',1206,y+50);
+    y+=86;});
+  const P=state.pat;
+  x.fillStyle='#eef0f3';x.font=`700 21px ${F}`;x.fillText('Pola Jahitan',1130,y+24);
+  x.fillStyle='#9097a1';x.font=`500 17px ${F}`;
+  x.fillText(P.type==='asli'?'Asli (sesuai foto)':`${PATTERNS.find(q=>q[0]===P.type)[1]} · ${P.style==='double'?'Double':'Single'} stitch · ${P.size} · ${P.area==='both'?'Tengah + Samping':'Panel Tengah'}`,1130,y+50);
+  x.fillStyle='#5c636d';x.font=`500 14px ${F}`;x.fillText('Simulasi visual — warna aktual material dapat sedikit berbeda.',1130,H-40);
+  const a=document.createElement('a');a.download=`alldila-${(proj||'konfigurasi').replace(/\s+/g,'-').toLowerCase()}.png`;a.href=cv.toDataURL('image/png');a.click();
+  state.hold=wasHold;toast('PNG diunduh');
+};
+
+renderParts();markPreset();
+init().catch(err=>{document.getElementById('loading').textContent='Gagal memuat foto: '+err;});
+</script>
+</body>
+</html>

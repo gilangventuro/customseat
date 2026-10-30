@@ -1,0 +1,49 @@
+{
+  "depan": {
+    "zones": [
+      "body",
+      "panel",
+      "accent",
+      "armrest"
+    ],
+    "size": [
+      960,
+      1280
+    ]
+  },
+  "samping": {
+    "zones": [
+      "body",
+      "panel",
+      "accent",
+      "armrest"
+    ],
+    "size": [
+      960,
+      1280
+    ]
+  },
+  "belakang": {
+    "zones": [
+      "body",
+      "panel",
+      "accent"
+    ],
+    "size": [
+      960,
+      1280
+    ]
+  },
+  "atas": {
+    "zones": [
+      "body",
+      "panel",
+      "accent",
+      "armrest"
+    ],
+    "size": [
+      960,
+      1280
+    ]
+  }
+}

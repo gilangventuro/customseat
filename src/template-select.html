@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pilih Model Kursi (Dummy)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff; --line:#e6e6e8;
+    --text:#14161a; --muted:#8a8d93; --brand:#2c9d36; --brand-2:#237a2b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;min-height:100%}
+  button{font:inherit;color:inherit}
+  .notice{background:#fbf3d9;border-bottom:1px solid #ecd98a;color:#7a5f06;font-size:12.5px;padding:8px 20px;text-align:center}
+  .notice a{color:#7a5f06}
+  .wrap{flex:1;display:flex;flex-direction:column;min-height:0}
+  .topbar{display:flex;align-items:baseline;gap:10px;padding:24px 24px 4px;justify-content:center;text-align:center}
+  .topbar b{font-size:20px;font-weight:800;font-style:italic;color:var(--brand);letter-spacing:-.5px}
+  .topbar span{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+
+  .stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y;cursor:grab}
+  .stage.dragging{cursor:grabbing}
+  .track{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  .card{position:absolute;width:588px;max-width:92vw;height:95%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;transition:transform .45s cubic-bezier(.22,.8,.3,1),opacity .45s;user-select:none;cursor:pointer}
+  .card.center{cursor:grab}
+  .card canvas{width:100%;flex:1;display:block;pointer-events:none}
+  .card.center canvas{pointer-events:auto;cursor:grab;touch-action:none}
+  .card.center canvas:active{cursor:grabbing}
+  .card .name{text-align:center;font-size:14px;font-weight:700;margin-top:6px}
+  .card .name small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:2px}
+
+  .footer{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 20px 32px}
+  .btn-pick{margin-top:4px;background:var(--brand);border:1px solid var(--brand);color:#fff;border-radius:12px;padding:13px 32px;font-size:14.5px;font-weight:700;cursor:pointer;transition:.15s}
+  .btn-pick:hover{background:var(--brand-2)}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:10px}
+
+  @media (max-width:640px){
+    .card{width:320px}
+  }
+</style>
+</head>
+<body>
+<div class="notice">⚠ Demo / dummy: daftar model di bawah ini contoh tampilan pilih model — sebagian masih memakai model 3D yang sama sebagai placeholder. <a href="index.html">← Kembali ke simulator jok bis</a></div>
+<div class="wrap">
+  <div class="topbar"><b>Alldila Seats</b><span>Pilih Model Kursi</span></div>
+
+  <div class="stage" id="stage">
+    <div class="track" id="track"></div>
+  </div>
+
+  <div class="footer">
+    <button class="btn-pick" id="btnPick">Pilih model ini</button>
+    <div class="hint">Model akan dibuka di halaman edit warna &amp; material.</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+
+/* ---------- daftar model (ganti "file" per model saat aset asli sudah ada) ---------- */
+const MODELS = [
+  {
+    id: "kursi-gaming-pro",
+    name: "Kursi Gaming Pro",
+    desc: "Model 3D asli yang dipakai untuk menguji simulator (putar, zoom & ganti warna).",
+    file: "assets/kursipijat.fbx",
+    dummy: false,
+    target: "dummy-kursi-gaming.html",
+  },
+  {
+    id: "kursi-eksekutif",
+    name: "Kursi Eksekutif (contoh)",
+    desc: "Placeholder — memakai model 3D yang sama sementara menunggu aset asli.",
+    file: "assets/kursipijat.fbx",
+    dummy: true,
+    target: "dummy-kursi-gaming.html",
+  },
+  {
+    id: "kursi-pijat-classic",
+    name: "Kursi Pijat Classic (contoh)",
+    desc: "Placeholder — memakai model 3D yang sama sementara menunggu aset asli.",
+    file: "assets/kursipijat.fbx",
+    dummy: true,
+    target: "dummy-kursi-gaming.html",
+  },
+];
+
+const track = document.getElementById('track');
+const btnPick = document.getElementById('btnPick');
+const stage = document.getElementById('stage');
+
+let centerIndex = 0;
+const cards = [];
+const sharedModels = {}; // file -> loaded THREE.Object3D (base, for cloning)
+const loader = new FBXLoader();
+
+function getBaseModel(file){
+  if (sharedModels[file]) return sharedModels[file].promise;
+  const p = new Promise((resolve, reject) => {
+    loader.load(file, obj => resolve(obj), undefined, reject);
+  });
+  sharedModels[file] = { promise: p };
+  return p;
+}
+
+MODELS.forEach((m) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <canvas></canvas>
+    <div class="name">${m.name}${m.dummy ? '<small>Placeholder model</small>' : ''}</div>
+  `;
+  track.appendChild(card);
+
+  const entry = { el: card, model: m, renderer: null, scene: null, camera: null, group: null, ready: false, rotY: 0 };
+  card.addEventListener('click', () => { if (!justDragged) setCenter(cards.indexOf(entry)); });
+  cards.push(entry);
+
+  /* ---------- putar manual kursi yang di tengah: hanya depan - kiri - kanan, tidak sampai belakang ---------- */
+  const ROT_LIMIT = Math.PI * 0.4; // ~72 derajat dari depan ke tiap sisi
+  const canvasEl = card.querySelector('canvas');
+  let rotating = false, rotStartX = 0, rotStartY = 0;
+  canvasEl.addEventListener('pointerdown', e => {
+    if (!card.classList.contains('center') || !entry.group) return;
+    rotating = true; rotStartX = e.clientX; rotStartY = entry.rotY;
+    canvasEl.setPointerCapture(e.pointerId);
+    e.stopPropagation();
+  });
+  canvasEl.addEventListener('pointermove', e => {
+    if (!rotating) return;
+    e.stopPropagation();
+    const dx = e.clientX - rotStartX;
+    entry.rotY = Math.max(-ROT_LIMIT, Math.min(ROT_LIMIT, rotStartY + dx * 0.008));
+    entry.group.rotation.y = entry.rotY;
+    entry.renderer.render(entry.scene, entry.camera);
+  });
+  canvasEl.addEventListener('pointerup', e => {
+    if (!rotating) return;
+    rotating = false;
+    e.stopPropagation();
+  });
+});
+
+function setupMiniViewer(entry){
+  const canvas = entry.el.querySelector('canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.3;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x9098a2, 1.6);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xffffff, 2.1);
+  key.position.set(200, 300, 150);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xffffff, 1.0);
+  fill.position.set(-180, 120, -120);
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.8);
+  rim.position.set(0, 150, -250);
+  scene.add(rim);
+
+  entry.renderer = renderer;
+  entry.scene = scene;
+  entry.camera = camera;
+
+  getBaseModel(entry.model.file).then(base => {
+    const clone = base.clone(true);
+    clone.traverse(n => { if (n.isMesh) { n.castShadow = false; n.receiveShadow = false; } });
+    scene.add(clone);
+
+    const box = new THREE.Box3().setFromObject(clone);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    clone.position.sub(center);
+
+    const radius = Math.max(size.x, size.y, size.z) * 0.5 || 100;
+    const dist = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.35;
+    camera.position.set(dist * 0.12, dist * 0.1, dist * 1.0);
+    camera.near = radius / 100; camera.far = radius * 50;
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+
+    entry.group = clone;
+    entry.ready = true;
+    resizeViewer(entry);
+  }).catch(err => console.error('Gagal memuat model preview', err));
+}
+
+function resizeViewer(entry){
+  if (!entry.renderer) return;
+  const w = entry.el.clientWidth, h = entry.el.clientHeight;
+  if (!w || !h) return;
+  entry.renderer.setSize(w, h, false);
+  entry.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  if (entry.camera) { entry.camera.aspect = w / h; entry.camera.updateProjectionMatrix(); }
+}
+
+cards.forEach(setupMiniViewer);
+window.addEventListener('resize', () => cards.forEach(resizeViewer));
+
+function layout(){
+  const n = cards.length;
+  cards.forEach((entry, i) => {
+    let diff = i - centerIndex;
+    if (diff > n / 2) diff -= n;
+    if (diff < -n / 2) diff += n;
+    const gap = Math.min(stage.clientWidth * 0.36, 340);
+    const scale = diff === 0 ? 1 : 0.68;
+    const opacity = Math.abs(diff) > 1 ? 0 : (diff === 0 ? 1 : 0.45);
+    const z = 10 - Math.abs(diff);
+    entry.el.style.transform = `translateX(${diff * gap}px) scale(${scale})`;
+    entry.el.style.opacity = opacity;
+    entry.el.style.zIndex = z;
+    entry.el.classList.toggle('center', diff === 0);
+  });
+  requestAnimationFrame(() => cards.forEach(resizeViewer));
+}
+
+function setCenter(i){
+  centerIndex = ((i % cards.length) + cards.length) % cards.length;
+  layout();
+}
+
+/* ---------- pilih model: klik kartu di samping, atau geser (drag) dengan kursor ---------- */
+let dragStartX = null, justDragged = false;
+stage.addEventListener('pointerdown', e => { dragStartX = e.clientX; stage.classList.add('dragging'); });
+stage.addEventListener('pointermove', e => {
+  if (dragStartX === null) return;
+  if (Math.abs(e.clientX - dragStartX) > 8) justDragged = true;
+});
+stage.addEventListener('pointerup', e => {
+  if (dragStartX === null) return;
+  const dx = e.clientX - dragStartX;
+  dragStartX = null;
+  stage.classList.remove('dragging');
+  if (Math.abs(dx) > 40) {
+    setCenter(centerIndex + (dx < 0 ? 1 : -1));
+  }
+  setTimeout(() => { justDragged = false; }, 0);
+});
+stage.addEventListener('pointerleave', () => { dragStartX = null; stage.classList.remove('dragging'); });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft') setCenter(centerIndex - 1);
+  if (e.key === 'ArrowRight') setCenter(centerIndex + 1);
+});
+
+btnPick.onclick = () => {
+  const m = cards[centerIndex].model;
+  window.location.href = m.target + '?model=' + encodeURIComponent(m.id);
+};
+
+layout();
+
+/* ---------- model dibiarkan diam di sudut awal, tidak auto-rotate ---------- */
+function renderAll(){
+  const n = cards.length;
+  cards.forEach((entry, i) => {
+    if (!entry.ready || !entry.group) return;
+    let diff = i - centerIndex;
+    if (diff > n / 2) diff -= n;
+    if (diff < -n / 2) diff += n;
+    if (Math.abs(diff) > 1) return;
+    entry.renderer.render(entry.scene, entry.camera);
+  });
+}
+const origSetCenter = setCenter;
+setCenter = function(i){
+  origSetCenter(i);
+  const entry = cards[centerIndex];
+  entry.rotY = 0;
+  if (entry.group) entry.group.rotation.y = 0;
+  requestAnimationFrame(renderAll);
+};
+cards.forEach(entry => {
+  const check = () => { if (entry.ready) renderAll(); else requestAnimationFrame(check); };
+  check();
+});
+window.addEventListener('resize', () => requestAnimationFrame(renderAll));
+</script>
+</body>
+</html>
