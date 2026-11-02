@@ -457,6 +457,7 @@ loader.load('assets/kursi-eksekutif-v2.fbx',
       if (!n.isMesh) return;
       n.castShadow = false; n.receiveShadow = false;
       const mats = Array.isArray(n.material) ? n.material : [n.material];
+      mats.forEach(m => { m.side = THREE.DoubleSide; });
       if (mats.some(m => STRIP_MATERIALS.includes(m.name))) toStrip.push(n);
     });
     toStrip.forEach(n => n.parent && n.parent.remove(n));
