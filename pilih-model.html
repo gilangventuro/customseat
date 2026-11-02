@@ -25,7 +25,7 @@
   .stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y;cursor:grab}
   .stage.dragging{cursor:grabbing}
   .track{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-  .card{position:absolute;width:588px;max-width:92vw;height:95%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;transition:transform .45s cubic-bezier(.22,.8,.3,1);user-select:none;cursor:pointer}
+  .card{position:absolute;width:588px;max-width:92vw;height:95%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;transition:transform .45s cubic-bezier(.22,.8,.3,1),opacity .45s,filter .45s;user-select:none;cursor:pointer}
   .card.center{cursor:grab}
   .card canvas{width:100%;flex:1;display:block;pointer-events:none}
   .card.center canvas{pointer-events:auto;cursor:grab;touch-action:none}
@@ -242,6 +242,8 @@ function layout(){
     const z = 10 - Math.abs(diff);
     entry.el.style.transform = `translateX(${diff * gap}px) scale(${scale})`;
     entry.el.style.zIndex = z;
+    entry.el.style.opacity = diff === 0 ? 1 : 0.55;
+    entry.el.style.filter = diff === 0 ? 'none' : 'blur(2.5px)';
     entry.el.classList.toggle('center', diff === 0);
   });
   requestAnimationFrame(() => cards.forEach(resizeViewer));
