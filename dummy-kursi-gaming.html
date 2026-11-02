@@ -80,6 +80,25 @@
   .btn.primary:hover{background:var(--brand-2)}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#222;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:20}
   .toast.show{opacity:1;transform:translateX(-50%)}
+  .part-row-line{display:flex;align-items:center;gap:6px}
+  .part-row-line .part-row{flex:1;min-width:0;width:auto}
+  .del-btn{width:28px;height:28px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;font-size:14px;line-height:1;transition:.15s}
+  .del-btn:hover{background:rgba(220,70,70,.18);border-color:rgba(220,70,70,.4);color:#ff8d8d}
+  .add-card{border:1px dashed var(--line);border-radius:14px;margin-bottom:6px;transition:.15s}
+  .add-card.open{background:var(--panel-2);border-color:var(--line);border-style:solid}
+  .add-row{display:flex;align-items:center;gap:12px;width:100%;background:none;border:0;padding:10px;cursor:pointer;text-align:left;border-radius:14px;color:var(--text)}
+  .add-row:hover{background:rgba(255,255,255,.04)}
+  .add-row .plus{width:34px;height:34px;border-radius:10px;border:1px dashed rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:18px;color:var(--muted)}
+  .add-row .t{flex:1;min-width:0}
+  .add-row .t b{display:block;font-size:14px}
+  .add-row .t small{color:var(--muted);font-size:12px}
+  .add-row .chev{color:var(--muted);transition:.2s}
+  .add-card.open .add-row .chev{transform:rotate(180deg)}
+  .add-body{display:none;padding:2px 12px 14px}
+  .add-card.open .add-body{display:block}
+  .add-types{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .add-type-btn{border:1px solid var(--line);background:var(--panel-2);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer}
+  .add-type-btn:hover{background:#262b33}
   @media (max-width:900px){
     .app{grid-template-columns:1fr;height:auto}
     .view{min-height:60vh}
@@ -285,6 +304,8 @@ const TRIM = [['Walnut','#6b4429'],['Teak','#9a6438'],['Ebony','#2a2420'],['Mapl
 const LEATHER = [['Onyx Black','#1b1c1f'],['Graphite','#2c3036'],['Charcoal','#3a3e44'],['Slate Grey','#4f555d'],['Silver Grey','#8a9097'],['Ivory','#e6dfd0'],['Pearl White','#f1efea'],['Cream','#d9c8a8'],
   ['Tan','#b27b4c'],['Cognac','#8b4a22'],['Mocha','#5a3e30'],['Espresso','#3c2a21'],['Burgundy','#6a1f2b'],['Racing Red','#a3222a'],['Navy','#1f2c4c'],['Ocean Blue','#2f5a7e'],
   ['Midnight','#1a2238'],['Olive','#555b3a'],['Forest','#28463a'],['Camel','#c19a6b'],['Sand','#cbb994'],['Plum','#4c2a3e'],['Teal','#1f5557'],['Orange','#c45a1c']];
+const WOOD = [['Oak','#c19a6b'],['Walnut','#6b4429'],['Mahogany','#4e2a1e'],['Teak','#9a6438'],['Cherry','#7b3f2a'],['Maple','#c49a63'],['Rosewood','#5b2a27'],['Ebony','#2a2420'],['Pine','#d8b983'],['Wenge','#3c2f2a']];
+const MATERIAL_TYPES = {kayu:{label:'Kayu', pal:WOOD, desc:'Material kayu tambahan'}, kulit:{label:'Kulit', pal:LEATHER, desc:'Material kulit tambahan'}};
 
 const PARTS3D = [
   {key:'body',  label:'Body Utama (Bantalan)', desc:'Headrest, sandaran, dudukan & footrest', mat:'06c9f4b7-4175-47c2-86ee-b7986d3da2b7', pal:LEATHER},
@@ -293,8 +314,38 @@ const PARTS3D = [
   {key:'trim',  label:'List / Trim',            desc:'List tipis di tepi armrest & panel', mat:'dd8ddbaa-e1ee-4dea-bed5-ff51c3ed0940', pal:TRIM},
   {key:'panel', label:'Panel Kontrol',          desc:'Plat kecil bertekstur di tengah dudukan', mat:'61bb72a4-3333-4651-a1ab-a2c8bf51b414', pal:SHELL},
 ];
-const allPal = [...LEATHER, ...SHELL, ...TRIM];
+const allPal = [...LEATHER, ...SHELL, ...TRIM, ...WOOD];
 const nameOf = (hex, pal) => { if(!hex) return 'Warna asli'; const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase()); return f?f[0]:'Custom'; };
+
+/* ---------- material custom tambahan (kayu / kulit) ---------- */
+const customParts = [];
+let customCount = {kayu:0, kulit:0};
+const getAllParts = () => PARTS3D.concat(customParts);
+function addCustomMaterial(type){
+  const def = MATERIAL_TYPES[type];
+  if (!def) return;
+  customCount[type]++;
+  const key = 'custom-'+type+'-'+Date.now();
+  const part = {key, label: def.label+' '+customCount[type], desc: def.desc, pal: def.pal, custom:true};
+  customParts.push(part);
+  matRefs[key] = [];
+  state.open = key;
+  addCardOpen = false;
+  renderParts();
+  toast(part.label+' ditambahkan');
+}
+function removeCustomMaterial(key){
+  const idx = customParts.findIndex(p => p.key === key);
+  if (idx < 0) return;
+  const label = customParts[idx].label;
+  customParts.splice(idx, 1);
+  delete state.c[key];
+  delete matRefs[key];
+  if (state.open === key) state.open = null;
+  renderParts();
+  toast(label+' dihapus');
+}
+let addCardOpen = false;
 
 const PRESETS3D = [
   {name:'Executive Tan',  c:{body:'#b27b4c',shell:'#6e5440',frame:'#1d1e21',trim:'#6b4429',panel:'#3e4147'}},
@@ -353,7 +404,7 @@ function applyColor(key, hex){
   state.c[key] = hex;
   (matRefs[key]||[]).forEach(m => m.color.set(hex));
   update();
-  toast(PARTS3D.find(p=>p.key===key).label+' diubah');
+  toast(getAllParts().find(p=>p.key===key).label+' diubah');
 }
 function resetPart(key){
   delete state.c[key];
@@ -361,18 +412,19 @@ function resetPart(key){
   update();
 }
 function resetAll(){
-  PARTS3D.forEach(p => resetPart(p.key));
+  getAllParts().forEach(p => resetPart(p.key));
 }
 
 const partsEl = document.getElementById('parts');
 function renderParts(){
   partsEl.innerHTML = '';
-  PARTS3D.forEach(p => {
+  getAllParts().forEach(p => {
     const hex = state.c[p.key];
     const el = document.createElement('div'); el.className = 'part'+(state.open===p.key?' open':'');
-    el.innerHTML = `<button class="part-row"><span class="sw-big ${hex?'':'sw orig'}" style="${hex?'background:'+hex:''}"></span>
+    el.innerHTML = `<div class="part-row-line"><button class="part-row"><span class="sw-big ${hex?'':'sw orig'}" style="${hex?'background:'+hex:''}"></span>
       <span class="t"><b>${p.label}</b><small>${nameOf(hex,p.pal)}${hex?' · '+hex.toUpperCase():''}</small></span>
       <svg class="chev" width="16" height="16" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
+      ${p.custom?'<button class="del-btn" title="Hapus material">✕</button>':''}</div>
       <div class="part-body"><p class="desc">${p.desc}</p><div class="grid"></div>
       <label class="custom">Warna custom <input type="color" value="${hex||'#'+(origHex[p.key]||'808080')}"><input type="text" value="${(hex||'').toUpperCase()}" placeholder="#RRGGBB" maxlength="7"></label></div>`;
     el.querySelector('.part-row').onclick = () => {
@@ -381,6 +433,8 @@ function renderParts(){
       renderParts();
       if (opening) flashPart(p.key);
     };
+    const delBtn = el.querySelector('.del-btn');
+    if (delBtn) delBtn.onclick = e => { e.stopPropagation(); removeCustomMaterial(p.key); };
     const grid = el.querySelector('.grid');
     const ob = document.createElement('button'); ob.className = 'sw orig'+(!hex?' sel':''); ob.title = 'Warna asli'; ob.textContent = 'ASLI';
     ob.onclick = () => { resetPart(p.key); }; grid.appendChild(ob);
@@ -391,6 +445,18 @@ function renderParts(){
     ti.onchange = e => { let v = e.target.value.trim(); if(v && !v.startsWith('#')) v = '#'+v; if(/^#[0-9a-f]{6}$/i.test(v)) applyColor(p.key, v.toLowerCase()); else e.target.value = (hex||'').toUpperCase(); };
     partsEl.appendChild(el);
   });
+
+  const addEl = document.createElement('div'); addEl.className = 'add-card'+(addCardOpen?' open':'');
+  addEl.innerHTML = `<button class="add-row"><span class="plus">+</span>
+      <span class="t"><b>Tambah Material</b><small>Tambahkan material kayu atau kulit baru</small></span>
+      <svg class="chev" width="16" height="16" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
+      <div class="add-body"><div class="add-types">
+        <button class="add-type-btn" data-type="kayu">🪵 Kayu</button>
+        <button class="add-type-btn" data-type="kulit">🧵 Kulit</button>
+      </div></div>`;
+  addEl.querySelector('.add-row').onclick = () => { addCardOpen = !addCardOpen; renderParts(); };
+  addEl.querySelectorAll('.add-type-btn').forEach(b => { b.onclick = e => { e.stopPropagation(); addCustomMaterial(b.dataset.type); }; });
+  partsEl.appendChild(addEl);
 }
 const presetsEl = document.getElementById('presets');
 function renderPresets(){
@@ -417,7 +483,7 @@ function selectPart(key){
   flashPart(key);
   const el = partsEl.querySelector('.part.open');
   if (el) el.scrollIntoView({behavior:'smooth', block:'nearest'});
-  toast(PARTS3D.find(p=>p.key===key).label+' dipilih · pilih warna di panel kanan');
+  toast(getAllParts().find(p=>p.key===key).label+' dipilih · pilih warna di panel kanan');
 }
 
 /* ---------- klik langsung di model untuk pilih bagian ---------- */
