@@ -96,6 +96,15 @@ const MODELS = [
     dummy: true,
     target: "dummy-kursi-gaming.html",
   },
+  {
+    id: "kursi-eksekutif-v2",
+    name: "Kursi Eksekutif",
+    desc: "Model 3D baru — body, list/trim & panel kontrol bisa diwarnai.",
+    file: "assets/kursi-eksekutif-v2.fbx",
+    dummy: false,
+    target: "dummy-kursi-eksekutif.html",
+    stripMaterials: ["de9c73e5-76dd-46c8-a3c4-469df205119e"],
+  },
 ];
 
 const track = document.getElementById('track');
@@ -107,10 +116,21 @@ const cards = [];
 const sharedModels = {}; // file -> loaded THREE.Object3D (base, for cloning)
 const loader = new FBXLoader();
 
-function getBaseModel(file){
+function getBaseModel(file, stripMaterials){
   if (sharedModels[file]) return sharedModels[file].promise;
   const p = new Promise((resolve, reject) => {
-    loader.load(file, obj => resolve(obj), undefined, reject);
+    loader.load(file, obj => {
+      if (stripMaterials && stripMaterials.length) {
+        const toStrip = [];
+        obj.traverse(n => {
+          if (!n.isMesh) return;
+          const mats = Array.isArray(n.material) ? n.material : [n.material];
+          if (mats.some(m => stripMaterials.includes(m.name))) toStrip.push(n);
+        });
+        toStrip.forEach(n => n.parent && n.parent.remove(n));
+      }
+      resolve(obj);
+    }, undefined, reject);
   });
   sharedModels[file] = { promise: p };
   return p;
@@ -179,7 +199,7 @@ function setupMiniViewer(entry){
   entry.scene = scene;
   entry.camera = camera;
 
-  getBaseModel(entry.model.file).then(base => {
+  getBaseModel(entry.model.file, entry.model.stripMaterials).then(base => {
     const clone = base.clone(true);
     clone.traverse(n => { if (n.isMesh) { n.castShadow = false; n.receiveShadow = false; } });
     scene.add(clone);
