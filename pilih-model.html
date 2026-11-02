@@ -22,10 +22,10 @@
   .topbar b{font-size:20px;font-weight:800;font-style:italic;color:var(--brand);letter-spacing:-.5px}
   .topbar span{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
 
-  .stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y;cursor:grab}
+  .stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y;cursor:grab;perspective:1400px}
   .stage.dragging{cursor:grabbing}
-  .track{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
-  .card{position:absolute;width:588px;max-width:92vw;height:95%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;transition:transform .45s cubic-bezier(.22,.8,.3,1),opacity .45s;user-select:none;cursor:pointer}
+  .track{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;transform-style:preserve-3d}
+  .card{position:absolute;width:588px;max-width:92vw;height:95%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;transition:transform .5s cubic-bezier(.22,.8,.3,1);user-select:none;cursor:pointer;backface-visibility:hidden}
   .card.center{cursor:grab}
   .card canvas{width:100%;flex:1;display:block;pointer-events:none}
   .card.center canvas{pointer-events:auto;cursor:grab;touch-action:none}
@@ -78,14 +78,6 @@ const MODELS = [
     desc: "Model 3D asli yang dipakai untuk menguji simulator (putar, zoom & ganti warna).",
     file: "assets/kursipijat.fbx",
     dummy: false,
-    target: "dummy-kursi-gaming.html",
-  },
-  {
-    id: "kursi-eksekutif",
-    name: "Kursi Eksekutif (contoh)",
-    desc: "Placeholder — memakai model 3D yang sama sementara menunggu aset asli.",
-    file: "assets/kursipijat.fbx",
-    dummy: true,
     target: "dummy-kursi-gaming.html",
   },
   {
@@ -240,12 +232,10 @@ function layout(){
     let diff = i - centerIndex;
     if (diff > n / 2) diff -= n;
     if (diff < -n / 2) diff += n;
-    const gap = Math.min(stage.clientWidth * 0.36, 340);
-    const scale = diff === 0 ? 1 : 0.68;
-    const opacity = Math.abs(diff) > 1 ? 0 : (diff === 0 ? 1 : 0.45);
+    const gap = Math.min(stage.clientWidth * 0.34, 320);
+    const scale = diff === 0 ? 1 : 0.7;
     const z = 10 - Math.abs(diff);
-    entry.el.style.transform = `translateX(${diff * gap}px) scale(${scale})`;
-    entry.el.style.opacity = opacity;
+    entry.el.style.transform = `translateX(${diff * gap}px) translateZ(${-Math.abs(diff) * 160}px) rotateY(${diff * -32}deg) scale(${scale})`;
     entry.el.style.zIndex = z;
     entry.el.classList.toggle('center', diff === 0);
   });
