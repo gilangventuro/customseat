@@ -199,12 +199,18 @@ function setupMiniViewer(entry){
   getBaseModel(entry.model.file, entry.model.stripMaterials).then(base => {
     const clone = base.clone(true);
     clone.traverse(n => { if (n.isMesh) { n.castShadow = false; n.receiveShadow = false; } });
-    scene.add(clone);
 
     const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
+    /* clone bisa punya offset koordinat lokal yang jauh dari origin (mis. aset FBX
+       yang awalnya bagian dari scene besar). Taruh clone di dalam pivot kosong di
+       origin supaya memutar pivot (bukan clone langsung) berputar di tempat, tidak
+       "terbang" mengorbit titik offset tsb. */
+    const pivot = new THREE.Group();
     clone.position.sub(center);
+    pivot.add(clone);
+    scene.add(pivot);
 
     const radius = Math.max(size.x, size.y, size.z) * 0.5 || 100;
     const dist = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.35;
@@ -213,7 +219,7 @@ function setupMiniViewer(entry){
     camera.lookAt(0, 0, 0);
     camera.updateProjectionMatrix();
 
-    entry.group = clone;
+    entry.group = pivot;
     entry.ready = true;
     resizeViewer(entry);
   }).catch(err => console.error('Gagal memuat model preview', err));
