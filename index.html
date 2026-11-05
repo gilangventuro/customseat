@@ -18,8 +18,8 @@
   .notice{background:#fbf3d9;border-bottom:1px solid #ecd98a;color:#7a5f06;font-size:12.5px;padding:8px 20px;text-align:center}
   .notice a{color:#7a5f06}
   .wrap{flex:1;display:flex;flex-direction:column;min-height:0}
-  .topbar{display:flex;align-items:baseline;gap:10px;padding:24px 24px 4px;justify-content:center;text-align:center}
-  .topbar b{font-size:20px;font-weight:800;font-style:italic;color:var(--brand);letter-spacing:-.5px}
+  .topbar{display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px 24px 4px;text-align:center}
+  .topbar img{height:36px;width:auto}
   .topbar span{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
 
   .stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y;cursor:grab}
@@ -45,7 +45,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="topbar"><b>Alldila Seats</b><span>Pilih Model Kursi</span></div>
+  <div class="topbar"><img src="assets/logo-alldila-seats.png" alt="Alldila Seats"><span>Pilih Model Kursi</span></div>
 
   <div class="stage" id="stage">
     <div class="track" id="track"></div>
