@@ -78,6 +78,7 @@
 <script type="module">
 import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 /* ---------- daftar model (ganti "file" per model saat aset asli sudah ada) ---------- */
 const MODELS = [
@@ -106,6 +107,14 @@ const MODELS = [
     target: "dummy-kursi-eksekutif.html",
     stripMaterials: ["de9c73e5-76dd-46c8-a3c4-469df205119e"],
   },
+  {
+    id: "kursi-twinseat",
+    name: "Kursi Captain Twin Seat",
+    desc: "Dari hasil scan 3D — kulit utama, aksen list & pengait bisa diwarnai.",
+    file: "assets/twin-seat-lowpoly.glb",
+    dummy: false,
+    target: "dummy-kursi-twinseat.html",
+  },
 ];
 
 const track = document.getElementById('track');
@@ -115,12 +124,15 @@ const stage = document.getElementById('stage');
 let centerIndex = 0;
 const cards = [];
 const sharedModels = {}; // file -> loaded THREE.Object3D (base, for cloning)
-const loader = new FBXLoader();
+const fbxLoader = new FBXLoader();
+const gltfLoader = new GLTFLoader();
 
 function getBaseModel(file, stripMaterials){
   if (sharedModels[file]) return sharedModels[file].promise;
+  const isGltf = /\.(glb|gltf)$/i.test(file);
   const p = new Promise((resolve, reject) => {
-    loader.load(file, obj => {
+    const onLoad = raw => {
+      const obj = isGltf ? raw.scene : raw;
       if (stripMaterials && stripMaterials.length) {
         const toStrip = [];
         obj.traverse(n => {
@@ -136,7 +148,8 @@ function getBaseModel(file, stripMaterials){
         mats.forEach(m => { m.side = THREE.DoubleSide; });
       });
       resolve(obj);
-    }, undefined, reject);
+    };
+    (isGltf ? gltfLoader : fbxLoader).load(file, onLoad, undefined, reject);
   });
   sharedModels[file] = { promise: p };
   return p;
@@ -209,6 +222,7 @@ function setupMiniViewer(entry){
   getBaseModel(entry.model.file, entry.model.stripMaterials).then(base => {
     const clone = base.clone(true);
     clone.traverse(n => { if (n.isMesh) { n.castShadow = false; n.receiveShadow = false; } });
+    if (entry.model.preRotateX) clone.rotation.x = entry.model.preRotateX;
 
     const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
