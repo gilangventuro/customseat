@@ -472,6 +472,13 @@ loader.load('assets/twin-seat-meshy.glb',
     camera.position.set(dist*0.55, dist*0.45, dist*0.75);
     camera.near = radius/100; camera.far = radius*50;
     camera.updateProjectionMatrix();
+    /* model ini (hasil export Blender/glTF) berskala meter (chair ~0.1 unit),
+       beda jauh dari model FBX lain yang berskala ratusan unit -- minDistance/
+       maxDistance OrbitControls harus ikut skala model, kalau tidak kamera
+       bisa "dipaksa" OrbitControls keluar dari far-plane dan kursi jadi tak
+       terlihat sama sekali (canvas hitam padahal model sudah ter-load). */
+    controls.minDistance = radius / 20;
+    controls.maxDistance = radius * 20;
     controls.target.set(0,0,0);
     controls.update();
     defaultCamPos = camera.position.clone();
