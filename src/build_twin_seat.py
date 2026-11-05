@@ -66,40 +66,48 @@ def main():
     arr = np.asarray(img)
     H, W = arr.shape[0], arr.shape[1]
 
-    # ---------- 1) haluskan mesh resolusi tinggi DULU ----------
-    # permukaan hasil scan (terutama kulit hitam) punya noise geometri halus
-    # (bergelombang/"kriting") bawaan photogrammetry. Kalau di-decimate dulu
-    # baru dihaluskan, decimator keburu mempertahankan noise itu sebagai
-    # "detail penting" (ikut jadi facet besar) -> hasil akhir tetap pecah.
-    # Makanya smoothing dilakukan di mesh aslinya (967rb vertex, topologi
-    # tidak berubah jadi UV asli masih valid), baru setelah itu di-decimate.
-    print("Menghaluskan mesh resolusi tinggi (Taubin smoothing, boundary dipin)...")
+    # ---------- 1) voxel remeshing -> jamin watertight (tanpa lubang) ----------
+    # mesh asli hasil scan TIDAK watertight -- ada ~109rb tepi terbuka dari
+    # total 1.8 juta segitiga (~6%), artinya banyak area yang kameranya tidak
+    # ter-capture (celah antar lipatan jok, bawah dudukan, dll). Ini bukan
+    # noise kecil yang bisa dibereskan fill_holes() biasa -- areanya luas dan
+    # tersebar. Solusinya: ubah mesh jadi grid voxel solid lalu ekstrak ulang
+    # permukaannya (marching cubes) -> hasilnya DIJAMIN watertight, lubang
+    # otomatis "ditutup" karena jadi volume padat. Detail sangat halus yang
+    # lebih kecil dari ukuran voxel akan hilang, tapi itu trade-off yang wajar
+    # dibanding tampilan bolong-bolong tembus pandang.
+    print("Voxel remeshing (menjamin mesh watertight, tanpa lubang)...")
+    size = (mesh.bounds[1] - mesh.bounds[0]).max()
+    pitch = size / 180
+    # catatan: pitch lebih halus (dicoba size/320, 1.2jt segitiga sebelum
+    # decimate) TIDAK membantu memulihkan warna aksen -- voxel+marching-cubes
+    # membuat permukaan baru yang posisinya cukup bergeser dari mesh asli
+    # sehingga nearest-vertex tidak lagi menangkap area tipis (list piping,
+    # pengait). Trade-off watertight vs deteksi warna per-bagian ini sudah
+    # final: model jadi satu warna kulit utama saja, tanpa pemisahan aksen.
+    vox = mesh.voxelized(pitch=pitch).fill()
+    solid = vox.marching_cubes
+    print(f"  watertight={solid.is_watertight} faces={len(solid.faces)}")
+
+    # permukaan voxel/marching-cubes berbentuk "tangga" kotak-kotak ->
+    # haluskan. Sekarang AMAN pakai smoothing kuat tanpa perlu pin boundary
+    # sama sekali, karena sudah watertight (tidak ada tepi terbuka yang bisa
+    # "meledak" seperti percobaan sebelumnya).
+    print("Menghaluskan permukaan voxel (Taubin smoothing)...")
     import trimesh.smoothing as sm
-    from trimesh.grouping import group_rows
-
-    # vertex di tepi/lubang non-manifold (hasil scan tidak watertight) harus
-    # "dipin" (dikunci di posisi asli) tiap putaran, kalau tidak smoothing
-    # kuat bikin tepi itu meledak jadi duri tajam (sudah kejadian di percobaan
-    # sebelumnya dengan 250 iterasi tanpa pin)
-    boundary_groups = group_rows(mesh.edges_sorted, require_count=1)
-    boundary_verts = np.unique(mesh.edges_sorted[boundary_groups]) if len(boundary_groups) else np.array([], dtype=int)
-    print(f"  {len(boundary_verts)} vertex boundary dipin dari total {len(mesh.vertices)}")
-    pinned_pos = mesh.vertices[boundary_verts].copy()
-
-    CYCLES, PER_CYCLE = 12, 8
-    for _ in range(CYCLES):
-        sm.filter_taubin(mesh, lamb=0.5, nu=-0.53, iterations=PER_CYCLE)
-        if len(boundary_verts):
-            mesh.vertices[boundary_verts] = pinned_pos
-    mesh = trimesh.Trimesh(vertices=mesh.vertices, faces=mesh.faces, process=False)
+    sm.filter_taubin(solid, lamb=0.5, nu=-0.53, iterations=25)
+    solid = trimesh.Trimesh(vertices=solid.vertices, faces=solid.faces, process=False)
 
     # ---------- 2) decimate SEKALI sebagai satu mesh utuh ----------
     print(f"Decimate mesh utuh -> target {TARGET_TOTAL_FACES} segitiga...")
-    simple = mesh.simplify_quadric_decimation(face_count=TARGET_TOTAL_FACES)
+    simple = solid.simplify_quadric_decimation(face_count=TARGET_TOTAL_FACES)
     simple = trimesh.Trimesh(vertices=simple.vertices, faces=simple.faces, process=False)
     print("vertices setelah decimate", simple.vertices.shape, "faces", simple.faces.shape)
 
-    # ---------- 3) bawa UV dari mesh asli (sudah dihaluskan) via nearest-vertex ----------
+    # ---------- 3) bawa UV dari mesh ASLI (sebelum voxelize) via nearest-vertex ----------
+    # mesh hasil voxel/decimate punya vertex yang sama sekali baru (bukan
+    # subset mesh asli), jadi warna/UV harus "dicari" dari titik terdekat di
+    # mesh asli yang masih punya UV & tekstur yang benar
     print("Transfer UV (nearest-vertex) ke mesh hasil decimate...")
     tree = cKDTree(mesh.vertices)
     _, nn_idx = tree.query(simple.vertices, k=1)

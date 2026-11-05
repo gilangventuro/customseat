@@ -280,37 +280,31 @@ resize();
 const LEATHER = [['Onyx Black','#1b1c1f'],['Graphite','#2c3036'],['Charcoal','#3a3e44'],['Slate Grey','#4f555d'],['Silver Grey','#8a9097'],['Ivory','#e6dfd0'],['Pearl White','#f1efea'],['Cream','#d9c8a8'],
   ['Tan','#b27b4c'],['Cognac','#8b4a22'],['Mocha','#5a3e30'],['Espresso','#3c2a21'],['Burgundy','#6a1f2b'],['Racing Red','#a3222a'],['Navy','#1f2c4c'],['Ocean Blue','#2f5a7e'],
   ['Midnight','#1a2238'],['Olive','#555b3a'],['Forest','#28463a'],['Camel','#c19a6b'],['Sand','#cbb994'],['Plum','#4c2a3e'],['Teal','#1f5557'],['Orange','#c45a1c']];
-const ACCENT = [['Mint Green','#7fb3a3'],['Forest Green','#1f5f44'],['Racing Red','#a3222a'],['Burgundy','#6a1f2b'],['Royal Blue','#1f4ea3'],['Navy','#1f2c4c'],['Gold','#c49e45'],['Silver','#b9bdc2'],['Charcoal','#3a3e44'],['Onyx Black','#1b1c1f']];
-const HARDWARE = [['Matte Black','#1d1e21'],['Gunmetal','#3e4147'],['Carbon','#2a2c30'],['Silver','#a7acb2'],['Chrome','#c9cdd2'],['Racing Red','#a3222a']];
-
-/* model ini hasil scan 3D (bukan model buatan manual), tekstur aslinya satu
-   atlas acak tanpa pemisahan material per bagian. Pemisahan "leather_main /
-   accent_green / hardware_red / logo_yellow" di bawah ini dibuat otomatis
-   dari deteksi warna tekstur (lihat src/build_twin_seat.py) — bukan hasil
-   pemetaan material asli seperti model kursi lain, jadi batas areanya bisa
-   sedikit tidak presisi di tepi jahitan. */
+/* model ini hasil scan 3D (bukan model buatan manual). Supaya permukaannya
+   tidak bolong/pecah (mesh asli scan tidak watertight), diproses lewat voxel
+   remeshing (lihat src/build_twin_seat.py) yang menjamin mesh jadi solid utuh
+   — tapi konsekuensinya detail tipis (list piping hijau, pengait merah) ikut
+   hilang karena lebih kecil dari resolusi voxel. Hasil akhirnya: satu warna
+   kulit untuk seluruh kursi, belum bisa dipisah per-elemen seperti model
+   kursi eksekutif/gaming yang dibuat manual. */
 const PARTS3D = [
-  {key:'leather',  label:'Kulit Utama', desc:'Jok sandaran, headrest, dudukan & footrest',
+  {key:'leather',  label:'Kulit Utama', desc:'Seluruh bagian jok: headrest, sandaran, dudukan, armrest & footrest',
     mat:['leather_main'], pal:LEATHER},
-  {key:'accent',   label:'Aksen / List Piping', desc:'Garis aksen di sandaran & dudukan',
-    mat:['accent_green'], pal:ACCENT},
-  {key:'hardware', label:'Pengait & Tuas', desc:'Pengunci footrest (quick release) & tuas recline',
-    mat:['hardware_red'], pal:HARDWARE},
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
 
-const allPal = [...LEATHER, ...ACCENT, ...HARDWARE];
+const allPal = [...LEATHER];
 const nameOf = (hex, pal) => { if(!hex) return 'Warna asli'; const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase()); return f?f[0]:'Custom'; };
 const findPart = key => PARTS3D.find(p => p.key === key);
 const findPartByMat = name => PARTS3D.find(p => p.mat.includes(name));
 
 const PRESETS3D = [
-  {name:'Original Green',  c:{leather:'#1b1c1f', accent:'#7fb3a3', hardware:'#1d1e21'}},
-  {name:'Racing Red',      c:{leather:'#1b1c1f', accent:'#a3222a', hardware:'#1d1e21'}},
-  {name:'Royal Navy',      c:{leather:'#1b1c1f', accent:'#1f4ea3', hardware:'#2a2c30'}},
-  {name:'Ivory Luxe',      c:{leather:'#e6dfd0', accent:'#c49e45', hardware:'#a7acb2'}},
-  {name:'Full Black',      c:{leather:'#1b1c1f', accent:'#1b1c1f', hardware:'#1d1e21'}},
+  {name:'Onyx Black',  c:{leather:'#1b1c1f'}},
+  {name:'Racing Red',  c:{leather:'#a3222a'}},
+  {name:'Royal Navy',  c:{leather:'#1f2c4c'}},
+  {name:'Ivory Luxe',  c:{leather:'#e6dfd0'}},
+  {name:'Cognac',      c:{leather:'#8b4a22'}},
 ];
 
 const state = {c:{}, open:'body', studio:false};
@@ -382,7 +376,7 @@ function renderPresets(){
   presetsEl.innerHTML = '';
   PRESETS3D.forEach(pr => {
     const b = document.createElement('button'); b.className = 'preset';
-    const dots = ['leather','accent','hardware'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
+    const dots = ['leather'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
     b.innerHTML = `<span class="dots">${dots}</span>${pr.name}`;
     b.onclick = () => { Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => m.color.set(h)); }); update(); toast(pr.name+' diterapkan'); };
     presetsEl.appendChild(b);
