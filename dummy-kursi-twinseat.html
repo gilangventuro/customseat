@@ -137,6 +137,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
 const canvas = document.getElementById('view');
 const overlay = document.getElementById('overlay');
@@ -280,16 +281,15 @@ resize();
 const LEATHER = [['Onyx Black','#1b1c1f'],['Graphite','#2c3036'],['Charcoal','#3a3e44'],['Slate Grey','#4f555d'],['Silver Grey','#8a9097'],['Ivory','#e6dfd0'],['Pearl White','#f1efea'],['Cream','#d9c8a8'],
   ['Tan','#b27b4c'],['Cognac','#8b4a22'],['Mocha','#5a3e30'],['Espresso','#3c2a21'],['Burgundy','#6a1f2b'],['Racing Red','#a3222a'],['Navy','#1f2c4c'],['Ocean Blue','#2f5a7e'],
   ['Midnight','#1a2238'],['Olive','#555b3a'],['Forest','#28463a'],['Camel','#c19a6b'],['Sand','#cbb994'],['Plum','#4c2a3e'],['Teal','#1f5557'],['Orange','#c45a1c']];
-/* model ini hasil scan 3D (bukan model buatan manual). Supaya permukaannya
-   tidak bolong/pecah (mesh asli scan tidak watertight), diproses lewat voxel
-   remeshing (lihat src/build_twin_seat.py) yang menjamin mesh jadi solid utuh
-   — tapi konsekuensinya detail tipis (list piping hijau, pengait merah) ikut
-   hilang karena lebih kecil dari resolusi voxel. Hasil akhirnya: satu warna
-   kulit untuk seluruh kursi, belum bisa dipisah per-elemen seperti model
-   kursi eksekutif/gaming yang dibuat manual. */
+/* model ini hasil scan 3D (Meshy AI reconstruction) dengan 1 material & 1
+   texture base-color yang menyimpan detail asli (jahitan, quilting, list
+   piping hijau, hardware) -- lihat src/convert_twin_meshy.py. Warna diterapkan
+   sebagai TINT (material.color dikalikan ke texture, bukan menimpa flat),
+   jadi detail aslinya tetap terlihat walau warnanya diganti. Karena cuma 1
+   material, belum bisa dipisah per-elemen seperti model eksekutif/gaming. */
 const PARTS3D = [
-  {key:'leather',  label:'Kulit Utama', desc:'Seluruh bagian jok: headrest, sandaran, dudukan, armrest & footrest',
-    mat:['leather_main'], pal:LEATHER},
+  {key:'leather',  label:'Kulit Utama', desc:'Seluruh bagian jok: headrest, sandaran, dudukan, armrest & footrest (warna = tint di atas tekstur asli)',
+    mat:['Material.001'], pal:LEATHER},
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
@@ -441,8 +441,11 @@ document.getElementById('btnPng').onclick = () => {
 };
 
 let model = null, defaultCamPos = null, defaultTarget = null;
+const draco = new DRACOLoader();
+draco.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
 const loader = new GLTFLoader();
-loader.load('assets/twin-seat-lowpoly.glb',
+loader.setDRACOLoader(draco);
+loader.load('assets/twin-seat-meshy.glb',
   gltf => {
     model = gltf.scene;
 

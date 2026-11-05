@@ -79,6 +79,7 @@
 import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
 /* ---------- daftar model (ganti "file" per model saat aset asli sudah ada) ---------- */
 const MODELS = [
@@ -110,8 +111,8 @@ const MODELS = [
   {
     id: "kursi-twinseat",
     name: "Kursi Captain Twin Seat",
-    desc: "Dari hasil scan 3D — kulit utama, aksen list & pengait bisa diwarnai.",
-    file: "assets/twin-seat-lowpoly.glb",
+    desc: "Dari hasil scan 3D — detail jahitan & list asli, warna kulit bisa diganti.",
+    file: "assets/twin-seat-meshy.glb",
     dummy: false,
     target: "dummy-kursi-twinseat.html",
   },
@@ -126,6 +127,9 @@ const cards = [];
 const sharedModels = {}; // file -> loaded THREE.Object3D (base, for cloning)
 const fbxLoader = new FBXLoader();
 const gltfLoader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
+gltfLoader.setDRACOLoader(dracoLoader);
 
 function getBaseModel(file, stripMaterials){
   if (sharedModels[file]) return sharedModels[file].promise;
