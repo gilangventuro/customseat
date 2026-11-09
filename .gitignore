@@ -2,5 +2,6 @@
 .env*
 
 # file sementara pipeline split_twin_seats (regenerable)
-_tmp_*.glb
+_tmp_*
 _test_classify.html
+__pycache__/

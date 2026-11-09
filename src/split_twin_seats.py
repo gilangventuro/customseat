@@ -1,47 +1,89 @@
 """
 Pecah assets/twin-seat-meshy.glb (1 mesh gabungan hasil Meshy AI, 2 kursi
 captain bersebelahan) menjadi 3 sub-mesh berdasarkan jenis permukaan:
-  - leather_main    : kulit polos (bolster samping, dudukan tepi, dll)
+  - leather_main    : kulit polos (bolster samping, headrest atas, dll)
   - leather_pattern : panel berlian/quilted (bagian tengah sandaran, dudukan,
                        footrest) -- warnanya SAMA PERSIS dengan leather_main
                        di tekstur asli, cuma beda motif jahitan (emboss),
                        jadi tidak bisa dipisah lewat warna.
-  - leather_accent  : list/piping hijau -- dideteksi lewat warna (hue hijau).
+  - leather_accent  : list/piping -- dideteksi lewat warna (hue hijau/teal).
 
 Ketiganya berlaku SIMETRIS di kursi kiri & kanan (bukan per-sisi).
 
-Cara deteksi panel berlian: garis jahitan (kerapatan tekstur tinggi di UV)
-dipakai sebagai "dinding" topologi di graf ketetanggaan segitiga (face
-adjacency) -- BUKAN sebagai kelas warna final. Area kulit yang dikelilingi
-jahitan rapat di semua sisi (= komponen terhubung kecil, karena terpotong-
-potong jadi sel-sel berlian) diklasifikasi "pattern". Area kulit polos yang
-menyambung luas tanpa banyak sekat jahitan (bolster, tepi dudukan) tetap jadi
-satu komponen besar -> "main". Garis jahitan itu sendiri ikut ke kelas
-tetangga mayoritasnya di langkah akhir.
+RIWAYAT PENDEKATAN (penting dibaca sebelum ubah threshold di bawah):
+Percobaan pertama menganalisis kerapatan tekstur langsung di ruang UV (pakai
+box-stddev di sekitar koordinat UV tiap segitiga). Hasilnya kacau, sebab
+tekstur model ini pakai UV atlas HASIL SCAN -- potongan-potongan kecil
+disusun acak tanpa padding (lihat assets kalau mau cek sendiri), jadi "area
+sekitar" satu titik UV sering kali sebenarnya milik permukaan 3D lain yang
+tidak berhubungan. Percobaan kedua (ukuran island via face_adjacency) juga
+gagal karena mesh-nya sendiri sudah terpecah ~2000 potongan kecil terputus
+(bukan 1 permukaan menyambung) akibat proses rekonstruksi/decimation, jadi
+ukuran potongan tidak berkorelasi dengan "polos vs berlian". Percobaan
+ketiga (kelengkungan normal 3D) juga gagal karena hampir semua permukaan,
+termasuk yang polos, punya noise kecil dari hasil scan.
+
+Yang akhirnya berhasil: render tampilan depan model (kamera tetap), analisis
+kerapatan tepi/jahitan di gambar HASIL RENDER itu (bukan tekstur UV mentah --
+di ruang gambar hasil render, piksel yang berdekatan memang berdekatan di
+model asli, beda dari atlas UV yang acak), lalu proyeksikan balik mask-nya
+ke tiap segitiga lewat ray-casting dari kamera yang sama. Bagian yang tidak
+kelihatan dari depan (sisi belakang headrest, dll) default ke leather_main
+karena motif berlian di model ini memang cuma ada di permukaan yang
+dihadapkan ke pengguna.
+
+"Kelihatan dari depan" TIDAK pakai ray-casting ketat (sempat dicoba 2 cara:
+trimesh+rtree murni Python terlalu lambat -- 150rb ray >40 menit belum
+selesai; BVHTree Blender lebih cepat tapi "first-hit" terlalu ketat --
+segitiga di sisi lekukan motif berlian ikut dibuang karena ketutup puncak
+jahitan di sebelahnya, padahal jelas bagian dari zona motif). Sebagai
+gantinya dipakai toleransi kedalaman per-piksel (lihat DEPTH_TOLERANCE):
+segitiga dianggap "dekat permukaan depan" kalau depth-nya tidak jauh dari
+permukaan TERDEPAN di piksel proyeksi yang sama -- jauh lebih murah (tidak
+perlu BVH/ray-cast sama sekali, cuma scatter-min numpy) dan hasilnya lebih
+sesuai maksud ("se-zona", bukan "triangle paling depan secara harfiah").
 
 Alur:
-  1. src/convert_twin_meshy.py -> assets/twin-seat-meshy.glb (1 material).
+  1. src/convert_twin_meshy.py (Blender) -> assets/twin-seat-meshy.glb (1 material).
   2. src/_export_merged_nodraco.py (Blender) -> _tmp_merged_nodraco.glb
      (tanpa draco supaya trimesh bisa baca UV+tekstur).
-  3. Skrip ini (trimesh+numpy+PIL+networkx) -> _tmp_classified.glb (3
+  3. src/_render_front.py (Blender) -> _tmp_front.png + _tmp_cam.json.
+  4. Skrip ini (trimesh+numpy+scipy) -> _tmp_classified.glb (3
      material, masih tanpa draco).
-  4. src/_compress_final.py (Blender) -> assets/twin-seat-meshy.glb final
+  5. src/_compress_final.py (Blender) -> assets/twin-seat-meshy.glb final
      (re-import + export draco, supaya file kecil).
 
 Jalankan:
   python src/split_twin_seats.py
 """
+import json
+import os
+
 import numpy as np
 import trimesh
-import networkx as nx
+from PIL import Image
+from scipy import ndimage
+from scipy.spatial import cKDTree
 
 SRC_GLB = "_tmp_merged_nodraco.glb"
+FRONT_PNG = "_tmp_front.png"
+CAM_JSON = "_tmp_cam.json"
 OUT_GLB = "_tmp_classified.glb"
 
-PATCH = 14           # ukuran patch (px) utk ukur kerapatan jahitan di UV
-STITCH_STD_THRESH = 17.0   # ambang stddev lokal = dianggap "garis jahitan"
-MAX_PATTERN_COMPONENT = 900  # komponen plain seluas ini atau lebih kecil -> panel berlian
-MIN_ISLAND = 40       # island lebih kecil dari ini (hasil akhir) digabung ke tetangga mayoritas
+SPATIAL_VOTE_K = 20           # jumlah tetangga spasial (KD-tree) terdekat buat voting
+                               # (sebelum difilter same_side, lihat bawah -- perlu agak
+                               # banyak krn sebagian bakal kebuang gara2 filter sisi shell)
+SPATIAL_VOTE_DOMINANCE = 0.85  # cuma balik label kalau mayoritas tetangga >= ini (lihat bawah)
+
+# -- parameter deteksi area motif berlian dari render depan --
+EDGE_STD_PATCH = 10       # radius box utk ukur stddev lokal (deteksi garis jahitan)
+EDGE_STD_THRESH = 8.0     # stddev lokal di atas ini = garis jahitan
+DENSITY_RADIUS = 20       # radius box utk ukur "berapa rapat garis jahitan di sekitar sini"
+DENSITY_THRESH = 0.35     # kerapatan di atas ini = garis outline motif berlian
+GAP_CLOSE = 13            # radius dilasi utk nyambungin celah kecil antar segmen garis
+                          # sebelum fill-holes (lihat build_pattern_mask_from_render)
+MIN_PATTERN_BLOB = 20000  # blob hasil klasifikasi lebih kecil dari ini dibuang (bukan panel asli)
+MAX_HOLE_FILL = 2500      # lubang di dalam blob pattern lebih kecil dari ini diisi
 
 
 def rgb_to_hsv_np(arr):
@@ -62,15 +104,170 @@ def rgb_to_hsv_np(arr):
     return h * 360, s, v
 
 
-def box_stats(ii, ii2, cy, cx, half):
-    y0, y1 = cy, cy + 2 * half + 1
-    x0, x1 = cx, cx + 2 * half + 1
+def box_filter_sum(binary_img, radius):
+    """Jumlah piksel 'true' dalam box (2r+1)x(2r+1) di sekitar tiap piksel."""
+    H, W = binary_img.shape
+    p = np.pad(binary_img.astype(np.float64), radius, mode="edge")
+    ii = np.pad(np.cumsum(np.cumsum(p, axis=0), axis=1), ((1, 0), (1, 0)))
+    ys, xs = np.meshgrid(np.arange(H), np.arange(W), indexing="ij")
+    y0, y1 = ys, ys + 2 * radius + 1
+    x0, x1 = xs, xs + 2 * radius + 1
+    return ii[y1, x1] - ii[y0, x1] - ii[y1, x0] + ii[y0, x0]
+
+
+def build_pattern_mask_from_render():
+    """Hasilkan mask 2D (di ruang gambar render depan) area panel berlian.
+
+    Pendekatan AWAL (kerapatan garis jahitan lokal lalu threshold langsung)
+    ternyata cuma melacak GARIS jahitannya sendiri (thin outline mengikuti
+    pola berlian), bukan AREA penuh di dalamnya -- hasil threshold density
+    juga ikut menyala di sepanjang garis jahitan tunggal bolster/headrest
+    (yang notabene cuma 1-2 garis panjang, bukan motif berlian), jadi area
+    yang kena jauh lebih luas dari panel berlian asli (nyaris seluruh jok).
+
+    Pendekatan yang benar: deteksi garis jahitan (seperti di atas) itu SUDAH
+    menghasilkan outline tertutup (closed loop) di sekeliling tiap sel
+    berlian -- makanya daripada threshold density dipakai langsung sbg mask
+    area, outline itu di-dilasi dikit buat nyambungin celah kecil antar
+    segmen garis, lalu di-ISI (binary_fill_holes) sehingga interior tiap sel
+    berlian ikut terisi, baru di-erosi balik ke ukuran semula. Area bolster
+    polos & headrest atas yang cuma punya 1-2 garis jahitan PANJANG (tidak
+    membentuk loop tertutup) otomatis tidak ikut terisi karena bukan area
+    "dikelilingi garis dari segala arah".
+    """
+    img = Image.open(FRONT_PNG).convert("RGB")
+    arr = np.asarray(img).astype(np.float32)
+    gray = arr.mean(axis=-1)
+    H, W = gray.shape
+
+    pad = EDGE_STD_PATCH // 2
+    gp = np.pad(gray, pad, mode="edge").astype(np.float64)
+    ii = np.pad(np.cumsum(np.cumsum(gp, axis=0), axis=1), ((1, 0), (1, 0)))
+    ii2 = np.pad(np.cumsum(np.cumsum(gp * gp, axis=0), axis=1), ((1, 0), (1, 0)))
+    ys, xs = np.meshgrid(np.arange(H), np.arange(W), indexing="ij")
+    y0, y1 = ys, ys + 2 * pad + 1
+    x0, x1 = xs, xs + 2 * pad + 1
     s = ii[y1, x1] - ii[y0, x1] - ii[y1, x0] + ii[y0, x0]
     s2 = ii2[y1, x1] - ii2[y0, x1] - ii2[y1, x0] + ii2[y0, x0]
     n = (y1 - y0) * (x1 - x0)
     mean = s / n
-    var = np.maximum(s2 / n - mean ** 2, 0)
-    return np.sqrt(var)
+    local_std = np.sqrt(np.maximum(s2 / n - mean ** 2, 0))
+    edge = local_std > EDGE_STD_THRESH
+
+    bg_mask = (
+        (np.abs(arr[:, :, 0] - 20) < 6)
+        & (np.abs(arr[:, :, 1] - 23) < 6)
+        & (np.abs(arr[:, :, 2] - 25) < 6)
+        & (local_std < 2)
+    )
+    obj_mask = ~bg_mask
+
+    density = box_filter_sum(edge, DENSITY_RADIUS) / (2 * DENSITY_RADIUS + 1) ** 2
+    lines = (density > DENSITY_THRESH) & obj_mask
+    lines = ndimage.binary_closing(lines, structure=np.ones((11, 11)))
+    lines = ndimage.binary_opening(lines, structure=np.ones((7, 7)))
+
+    closed = ndimage.binary_dilation(lines, structure=np.ones((GAP_CLOSE, GAP_CLOSE)))
+    filled = ndimage.binary_fill_holes(closed)
+    filled = ndimage.binary_erosion(filled, structure=np.ones((GAP_CLOSE, GAP_CLOSE)))
+    pat = filled & obj_mask
+
+    lbl, nlab = ndimage.label(pat, structure=np.ones((3, 3)))
+    sizes = ndimage.sum(np.ones_like(lbl), lbl, index=np.arange(1, nlab + 1))
+    keep = np.zeros(nlab + 1, dtype=bool)
+    keep[1:] = sizes > MIN_PATTERN_BLOB
+    clean = keep[lbl]
+
+    lbl2, nlab2 = ndimage.label(obj_mask & ~clean, structure=np.ones((3, 3)))
+    sizes2 = ndimage.sum(np.ones_like(lbl2), lbl2, index=np.arange(1, nlab2 + 1))
+    fillable = np.zeros(nlab2 + 1, dtype=bool)
+    fillable[1:] = sizes2 < MAX_HOLE_FILL
+    clean = clean | fillable[lbl2]
+
+    clean = ndimage.binary_closing(clean, structure=np.ones((7, 7)))
+    clean = ndimage.binary_opening(clean, structure=np.ones((5, 5)))
+    return clean, obj_mask
+
+
+DEPTH_TOLERANCE = 0.05  # satuan dunia -- toleransi "dekat permukaan terdepan" per
+                         # piksel; harus > relief motif berlian tapi < ketebalan shell
+FACING_THRESH = 0.5      # facing MENTAH harus < ini -- longgar, cuma jaring pengaman
+                         # tambahan di atas depth test (lihat komentar di atas)
+
+
+def project_with_depth_tolerance(mesh, cam):
+    """Proyeksikan centroid tiap segitiga ke piksel kamera depan. "Kelihatan"
+    didefinisikan longgar: depth-nya dekat dengan permukaan paling depan di
+    piksel yang sama (bukan harus PERSIS permukaan terdepan) -- supaya motif
+    berlian yang py bergelombang 3D tidak kepotong oleh self-occlusion."""
+    # matrix_world kamera diambil LANGSUNG dari Blender (lihat src/_render_front.py)
+    # supaya tidak perlu reimplementasi konversi Euler->matrix yang rawan salah
+    # urutan/konvensi -- kolom 0/1/2 dari bagian rotasi = sumbu local X/Y/Z kamera
+    # di world space; kamera Blender melihat ke arah -Z lokal.
+    #
+    # PENTING: Blender otomatis konversi glTF (Y-up) -> Blender (Z-up) saat
+    # import (bpy.ops.import_scene.gltf), tapi trimesh TIDAK -- trimesh.load()
+    # di skrip ini membaca vertex mentah dalam konvensi Y-up asli glTF. Jadi
+    # kamera (dari Blender, Z-up) harus dikonversi BALIK ke Y-up supaya cocok
+    # dengan mesh.vertices di sini. Bug ini sempat bikin proyeksi acak-acakan
+    # (segitiga di headrest/backrest proyeksi keluar frustum sama sekali).
+    def blender_to_gltf(v):
+        return np.array([v[0], v[2], -v[1]])
+
+    M = np.array(cam["matrix_world"])
+    loc = blender_to_gltf(M[:3, 3])
+    right = blender_to_gltf(M[:3, 0])
+    up = blender_to_gltf(M[:3, 1])
+    forward = blender_to_gltf(-M[:3, 2])
+
+    W, H = cam["res"]
+    fov = cam["angle"]
+    tan_half = np.tan(fov / 2)
+
+    centroids = mesh.triangles_center
+    normals = mesh.face_normals
+    rel = centroids - loc
+    depth = rel @ forward
+    lateral = rel @ right
+    vertical = rel @ up
+    ndc_x = (lateral / depth) / tan_half
+    ndc_y = (vertical / depth) / tan_half
+    px = ((ndc_x * 0.5 + 0.5) * W).astype(int)
+    py = ((1 - (ndc_y * 0.5 + 0.5)) * H).astype(int)
+    # "Kelihatan dari depan" butuh DUA tes, bukan satu:
+    #   1. DEPTH per-piksel (scatter-MIN) -- shell jok ini tipis, jadi sisi
+    #      BELAKANG (backrest shell, beda permukaan sama sekali) proyeksinya
+    #      sering jatuh di piksel yang SAMA dengan permukaan depan (dilihat
+    #      lurus dari kamera depan, depan & belakang shell nyaris segaris).
+    #      Tanpa depth test, segitiga belakang numpang ambil label mask yang
+    #      sama sekali tidak relevan buat mereka (lihat render debug "dari
+    #      belakang" -- penuh noise acak kalau depth test ditiadakan).
+    #      Toleransinya (DEPTH_TOLERANCE) dibuat GENEROUS -- lebih lebar dari
+    #      relief motif berlian (tonjolan/lekukan jahitan individual, biar
+    #      semua "lapisan depan" tetap lolos) tapi masih lebih sempit dari
+    #      ketebalan shell (biar lapisan belakang yg jelas beda permukaan
+    #      tetap kebuang).
+    #   2. FACING mentah per-segitiga (longgar) -- cuma buat jaga-jaga
+    #      exclude segitiga yg depth-nya kebetulan lolos tapi normalnya
+    #      sudah jelas menghadap berlawanan arah kamera.
+    # (Threshold facing MENTAH/ketat sendirian pernah dicoba dan gagal --
+    # relief motif berlian bikin normal lompat2 antar tetangga; tapi itu
+    # sebelum ketahuan akar masalah utamanya ada di langkah cleanup/voting,
+    # bukan di sini -- lihat catatan di bagian voting mayoritas spasial.)
+    facing = normals @ forward  # < 0 berarti normal menghadap ke arah kamera
+    in_frustum = (depth > 1e-6) & (px >= 0) & (px < W) & (py >= 0) & (py < H)
+
+    dmin = np.full((H, W), np.inf)
+    valid_idx = np.where(in_frustum)[0]
+    np.minimum.at(dmin, (py[valid_idx], px[valid_idx]), depth[valid_idx])
+
+    near_front = np.zeros(len(centroids), dtype=bool)
+    near_front[valid_idx] = (
+        (depth[valid_idx] <= dmin[py[valid_idx], px[valid_idx]] + DEPTH_TOLERANCE)
+        & (facing[valid_idx] < FACING_THRESH)
+    )
+
+    return px, py, near_front
 
 
 def main():
@@ -82,98 +279,90 @@ def main():
     img = mesh.visual.material.baseColorTexture.convert("RGB")
     arr = np.asarray(img).astype(np.float32)
     H, W = arr.shape[0], arr.shape[1]
-    gray = arr.mean(axis=-1)
 
-    print("Hitung UV & warna rata-rata tiap segitiga...")
+    print("Hitung warna rata-rata tiap segitiga (buat deteksi list aksen)...")
     face_uv = uv[mesh.faces].mean(axis=1)
-    px = np.clip((face_uv[:, 0] * W).astype(int), 0, W - 1)
-    py = np.clip(((1 - face_uv[:, 1]) * H).astype(int), 0, H - 1)
-    face_rgb = arr[py, px, :] / 255.0
+    px_uv = np.clip((face_uv[:, 0] * W).astype(int), 0, W - 1)
+    py_uv = np.clip(((1 - face_uv[:, 1]) * H).astype(int), 0, H - 1)
+    face_rgb = arr[py_uv, px_uv, :] / 255.0
     hue, sat, val = rgb_to_hsv_np(face_rgb)
-
-    print("Hitung kerapatan tekstur (local stddev) di sekitar tiap UV...")
-    pad = PATCH // 2
-    gray_pad = np.pad(gray, pad, mode="edge").astype(np.float64)
-    ii = np.pad(np.cumsum(np.cumsum(gray_pad, axis=0), axis=1), ((1, 0), (1, 0)))
-    ii2 = np.pad(np.cumsum(np.cumsum(gray_pad * gray_pad, axis=0), axis=1), ((1, 0), (1, 0)))
-    local_std = box_stats(ii, ii2, py, px, pad)
-
-    green = (hue >= 130) & (hue <= 200) & (sat > 0.12) & (val > 0.15)
-    stitch = (~green) & (local_std > STITCH_STD_THRESH)
-    plain = ~green & ~stitch
+    green = (hue >= 100) & (hue <= 200) & (sat > 0.1) & (val > 0.1)
 
     n = len(mesh.faces)
-    print(f"  green: {green.sum()} ({green.sum()/n*100:.1f}%)  stitch: {stitch.sum()} ({stitch.sum()/n*100:.1f}%)  plain: {plain.sum()} ({plain.sum()/n*100:.1f}%)")
+    print(f"  accent (hijau/teal): {green.sum()} ({green.sum()/n*100:.1f}%)")
 
-    print("Cari komponen terhubung di antara segitiga 'plain' (dibatasi garis jahitan & aksen)...")
-    adjacency = mesh.face_adjacency
-    both_plain = plain[adjacency[:, 0]] & plain[adjacency[:, 1]]
-    edges = adjacency[both_plain]
-    g = nx.Graph()
-    g.add_nodes_from(np.where(plain)[0])
-    g.add_edges_from(edges)
-    components = list(nx.connected_components(g))
-    print(f"  {len(components)} komponen plain ditemukan")
+    print("Bangun mask area panel berlian dari render depan...")
+    pattern_mask_2d, obj_mask_2d = build_pattern_mask_from_render()
 
-    labels = np.full(n, "", dtype=object)
-    labels[green] = "leather_accent"
-    comp_sizes = []
-    for comp in components:
-        comp = list(comp)
-        comp_sizes.append(len(comp))
-        cls = "leather_pattern" if len(comp) <= MAX_PATTERN_COMPONENT else "leather_main"
-        labels[comp] = cls
-    comp_sizes = np.array(comp_sizes)
-    print(f"  ukuran komponen: min={comp_sizes.min()} max={comp_sizes.max()} median={int(np.median(comp_sizes))}")
+    print("Load info kamera & proyeksikan tiap segitiga (toleransi kedalaman)...")
+    with open(CAM_JSON) as f:
+        cam = json.load(f)
+    px, py, visible = project_with_depth_tolerance(mesh, cam)
+    print(f"  segitiga di dekat permukaan depan: {visible.sum()} ({visible.sum()/n*100:.1f}%)")
 
-    print("Assign segitiga 'stitch' ke kelas tetangga mayoritas...")
-    face_adj_list = [[] for _ in range(n)]
-    for a, b in mesh.face_adjacency:
-        face_adj_list[a].append(b)
-        face_adj_list[b].append(a)
-    stitch_idx = np.where(stitch)[0]
-    # iterasi beberapa kali supaya stitch yg tetangganya jg stitch ikut terselesaikan
-    for _ in range(4):
-        changed = 0
-        for i in stitch_idx:
-            if labels[i]:
-                continue
-            votes = {}
-            for j in face_adj_list[i]:
-                lbl = labels[j]
-                if lbl:
-                    votes[lbl] = votes.get(lbl, 0) + 1
-            if votes:
-                labels[i] = max(votes, key=votes.get)
-                changed += 1
-        if changed == 0:
-            break
-    labels[labels == ""] = "leather_main"
+    in_pattern_2d = np.zeros(n, dtype=bool)
+    valid = visible
+    in_pattern_2d[valid] = pattern_mask_2d[py[valid], px[valid]]
+
+    labels = np.full(n, "leather_main", dtype=object)
+    labels[in_pattern_2d] = "leather_pattern"
+    labels[green] = "leather_accent"  # warna prioritas di atas motif
 
     for lbl in np.unique(labels):
         c = (labels == lbl).sum()
         print(f"  {lbl}: {c} segitiga ({c/n*100:.1f}%)")
 
-    print("Bersihkan noise (island kecil) via connected components (final)...")
-    same = labels[adjacency[:, 0]] == labels[adjacency[:, 1]]
-    edges2 = adjacency[same]
-    g2 = nx.Graph()
-    g2.add_nodes_from(range(n))
-    g2.add_edges_from(edges2)
-    final_components = list(nx.connected_components(g2))
+    print("Bersihkan noise via voting mayoritas spasial (KD-tree)...")
+    # CATATAN: dulu pakai connected-components di atas mesh.face_adjacency
+    # (gabungkan island kecil ke mayoritas tetangga topologis) -- ternyata
+    # itu JUSTRU SUMBER noise "garam-merica" utama, bukan solusinya. Model
+    # ini hasil scan/decimation yang mesh-nya sendiri sudah terpecah ~2000
+    # potongan kecil TERPUTUS (tidak nyambung lewat shared edge) walau
+    # posisinya berdempetan rapat secara spasial. Akibatnya banyak kelompok
+    # segitiga yang SUDAH BENAR klasifikasinya (misal bagian tengah panel
+    # berlian) kebetulan jadi island kecil secara topologi mesh (<MIN_ISLAND
+    # segitiga tersambung), lalu di-vote ikut tetangga topologis yang
+    # berseberangan label-nya (nyambung lewat seam/retakan mesh ke area
+    # lain) -- hasilnya belang acak walau label awal (sebelum cleanup) sudah
+    # rapi (sudah diverifikasi lewat render debug tanpa langkah cleanup ini).
+    #
+    # Fix: voting mayoritas pakai jarak SPASIAL (KD-tree centroid segitiga),
+    # bukan topologi mesh -- jadi kelompok yang padat & benar secara spasial
+    # tetap dipertahankan walau mesh-nya retak, sementara noise asli (segitiga
+    # nyasar yang tetangga spasialnya mayoritas beda label) tetap dibersihkan.
+    # PENTING: KD-tree jarak Euclidean MENTAH bisa salah pilih tetangga --
+    # model ini permukaan tipis (shell), jadi titik di sisi LUAR (misal
+    # puncak motif berlian yg kelihatan) & titik di sisi DALAM yg cuma
+    # beberapa mm di baliknya (menghadap arah berlawanan) sering kali lebih
+    # "dekat" secara jarak lurus daripada tetangga di permukaan yg sama.
+    # Makanya query tetangga agak banyak (k besar) lalu DIFILTER cuma yang
+    # normalnya mirip (dot > 0) sebelum voting -- supaya tidak numpang
+    # vote dari sisi lain shell yang jelas tidak relevan.
+    # CATATAN TAMBAHAN: voting mayoritas PENUH (ambil label terbanyak begitu
+    # saja, walau cuma menang tipis) ternyata JUGA menghasilkan noise baru --
+    # label berubah di jumlah segitiga yang kecil secara total (~1%), tapi
+    # tersebar pervasif (banyak kemenangan tipis/hampir seri di sekitar
+    # batas motif berlian yang memang rame & tidak stabil), jadi hasilnya
+    # malah lebih berbintik dibanding tanpa cleanup sama sekali. Makanya
+    # dipakai ambang KONSERVATIF -- cuma balik label kalau mayoritas
+    # tetangga spasial BENAR-BENAR dominan (>=85%) ke label lain; kalau
+    # tidak, biarkan label asli (klasifikasi dari proyeksi mask 2D, yang
+    # sudah terbukti rapi) apa adanya.
+    centroids = mesh.triangles_center
+    normals = mesh.face_normals
+    tree = cKDTree(centroids)
+    _, neighbor_idx = tree.query(centroids, k=SPATIAL_VOTE_K)
+    same_side = np.einsum("ij,ikj->ik", normals, normals[neighbor_idx]) > 0
+    neighbor_labels = labels[neighbor_idx]  # (n, k)
     clean = labels.copy()
-    for comp in final_components:
-        comp = list(comp)
-        lbl = labels[comp[0]]
-        if len(comp) < MIN_ISLAND:
-            # gabung ke tetangga mayoritas (di luar komponen ini)
-            votes = {}
-            for i in comp:
-                for j in face_adj_list[i]:
-                    if j not in comp:
-                        votes[labels[j]] = votes.get(labels[j], 0) + 1
-            if votes:
-                clean[comp] = max(votes, key=votes.get)
+    for i in range(n):
+        filt = neighbor_labels[i][same_side[i]]
+        if len(filt) < 6:
+            continue
+        vals, counts = np.unique(filt, return_counts=True)
+        top = np.argmax(counts)
+        if vals[top] != labels[i] and counts[top] / len(filt) >= SPATIAL_VOTE_DOMINANCE:
+            clean[i] = vals[top]
     for lbl in np.unique(clean):
         c = (clean == lbl).sum()
         print(f"  (bersih) {lbl}: {c} segitiga ({c/n*100:.1f}%)")
@@ -206,7 +395,6 @@ def main():
         out_scene.add_geometry(sub, node_name=cluster, geom_name=cluster)
 
     out_scene.export(OUT_GLB, include_normals=True)
-    import os
     print("Selesai ->", OUT_GLB, f"{os.path.getsize(OUT_GLB)/1e6:.1f} MB")
 
 
