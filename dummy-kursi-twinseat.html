@@ -282,16 +282,20 @@ const LEATHER = [['Onyx Black','#1b1c1f'],['Graphite','#2c3036'],['Charcoal','#3
   ['Tan','#b27b4c'],['Cognac','#8b4a22'],['Mocha','#5a3e30'],['Espresso','#3c2a21'],['Burgundy','#6a1f2b'],['Racing Red','#a3222a'],['Navy','#1f2c4c'],['Ocean Blue','#2f5a7e'],
   ['Midnight','#1a2238'],['Olive','#555b3a'],['Forest','#28463a'],['Camel','#c19a6b'],['Sand','#cbb994'],['Plum','#4c2a3e'],['Teal','#1f5557'],['Orange','#c45a1c']];
 /* model ini hasil scan 3D (Meshy AI reconstruction), mesh-nya dipecah jadi
-   2 bagian (kursi kiri & kanan, lihat src/split_twin_seats.py) dengan
-   material duplikat dari tekstur asli supaya tiap kursi bisa diwarnai
-   independen. Warna diterapkan sebagai TINT (material.color dikalikan ke
-   texture, bukan menimpa flat), jadi detail asli (jahitan, quilting, list,
+   3 bagian berdasarkan jenis permukaan (lihat src/split_twin_seats.py):
+   kulit utama, panel motif berlian/quilted, dan list aksen -- berlaku
+   SIMETRIS di kursi kiri & kanan sekaligus (1 model jok, bukan 2 model
+   terpisah), jadi ganti warna salah satu langsung kena ke kedua sisi.
+   Warna diterapkan sebagai TINT (material.color dikalikan ke texture,
+   bukan menimpa flat), jadi detail asli (jahitan, quilting, list,
    hardware) tetap terlihat walau warnanya diganti. */
 const PARTS3D = [
-  {key:'left',  label:'Kursi Kiri', desc:'Headrest, sandaran, dudukan & footrest kursi sebelah kiri (warna = tint di atas tekstur asli)',
-    mat:['leather_left'], pal:LEATHER},
-  {key:'right', label:'Kursi Kanan', desc:'Headrest, sandaran, dudukan & footrest kursi sebelah kanan (warna = tint di atas tekstur asli)',
-    mat:['leather_right'], pal:LEATHER},
+  {key:'main',    label:'Kulit Utama', desc:'Bolster & tepi dudukan/sandaran kiri-kanan (warna = tint di atas tekstur asli)',
+    mat:['leather_main'], pal:LEATHER},
+  {key:'pattern', label:'Motif Berlian', desc:'Panel quilted/berlian di tengah sandaran, dudukan & footrest kiri-kanan (warna = tint di atas tekstur asli)',
+    mat:['leather_pattern'], pal:LEATHER},
+  {key:'accent',  label:'List Aksen', desc:'Garis list di tepi kiri-kanan (warna = tint di atas tekstur asli)',
+    mat:['leather_accent'], pal:LEATHER},
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
@@ -302,11 +306,11 @@ const findPart = key => PARTS3D.find(p => p.key === key);
 const findPartByMat = name => PARTS3D.find(p => p.mat.includes(name));
 
 const PRESETS3D = [
-  {name:'Onyx Black',  c:{left:'#1b1c1f', right:'#1b1c1f'}},
-  {name:'Racing Red',  c:{left:'#a3222a', right:'#a3222a'}},
-  {name:'Royal Navy',  c:{left:'#1f2c4c', right:'#1f2c4c'}},
-  {name:'Ivory Luxe',  c:{left:'#e6dfd0', right:'#e6dfd0'}},
-  {name:'Cognac',      c:{left:'#8b4a22', right:'#8b4a22'}},
+  {name:'Onyx Black',  c:{main:'#1b1c1f', pattern:'#1b1c1f', accent:'#2bff6b'}},
+  {name:'Racing Red',  c:{main:'#1b1c1f', pattern:'#a3222a', accent:'#1b1c1f'}},
+  {name:'Royal Navy',  c:{main:'#1f2c4c', pattern:'#1f2c4c', accent:'#8a9097'}},
+  {name:'Ivory Luxe',  c:{main:'#e6dfd0', pattern:'#e6dfd0', accent:'#b27b4c'}},
+  {name:'Cognac',      c:{main:'#3c2a21', pattern:'#8b4a22', accent:'#8b4a22'}},
 ];
 
 const state = {c:{}, open:'body', studio:false};
@@ -378,7 +382,7 @@ function renderPresets(){
   presetsEl.innerHTML = '';
   PRESETS3D.forEach(pr => {
     const b = document.createElement('button'); b.className = 'preset';
-    const dots = ['left','right'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
+    const dots = ['main','pattern','accent'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
     b.innerHTML = `<span class="dots">${dots}</span>${pr.name}`;
     b.onclick = () => { Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => m.color.set(h)); }); update(); toast(pr.name+' diterapkan'); };
     presetsEl.appendChild(b);

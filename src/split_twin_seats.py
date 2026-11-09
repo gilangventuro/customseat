@@ -185,8 +185,23 @@ def main():
         face_mask = clean == cluster
         sub_faces = mesh.faces[face_mask]
         sub = trimesh.Trimesh(vertices=mesh.vertices, faces=sub_faces, process=False)
-        sub.visual = trimesh.visual.TextureVisuals(uv=uv, material=src_mat.copy())
-        sub.visual.material.name = cluster
+        # pakai object TEXTURE yang sama persis (bukan copy()/deep-copy) di
+        # ketiga material supaya exporter glTF simpan 1 salinan gambar saja
+        # (bukan 3x) -- tint warna tetap jalan per-material lewat THREE.js
+        # material.color di runtime, tidak butuh baseColorTexture terpisah.
+        cluster_mat = trimesh.visual.material.PBRMaterial(
+            name=cluster,
+            baseColorTexture=src_mat.baseColorTexture,
+            baseColorFactor=src_mat.baseColorFactor,
+            metallicFactor=src_mat.metallicFactor,
+            roughnessFactor=src_mat.roughnessFactor,
+            metallicRoughnessTexture=src_mat.metallicRoughnessTexture,
+            normalTexture=src_mat.normalTexture,
+            emissiveFactor=src_mat.emissiveFactor,
+            emissiveTexture=src_mat.emissiveTexture,
+            doubleSided=src_mat.doubleSided,
+        )
+        sub.visual = trimesh.visual.TextureVisuals(uv=uv, material=cluster_mat)
         sub.remove_unreferenced_vertices()
         out_scene.add_geometry(sub, node_name=cluster, geom_name=cluster)
 
