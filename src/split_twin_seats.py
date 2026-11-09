@@ -79,10 +79,12 @@ BRIGHTEN_HI_PCT = 90     # percentile atas tekstur asli dipakai sbg acuan "teran
 BRIGHTEN_TARGET_LO = 215  # hasil stretch: piksel paling gelap jadi seterang ini
 BRIGHTEN_TARGET_HI = 255  # & piksel paling terang jadi seterang ini (0-255)
 
-SPATIAL_VOTE_K = 20           # jumlah tetangga spasial (KD-tree) terdekat buat voting
+SPATIAL_VOTE_K = 24            # jumlah tetangga spasial (KD-tree) terdekat buat voting
                                # (sebelum difilter same_side, lihat bawah -- perlu agak
                                # banyak krn sebagian bakal kebuang gara2 filter sisi shell)
-SPATIAL_VOTE_DOMINANCE = 0.85  # cuma balik label kalau mayoritas tetangga >= ini (lihat bawah)
+SPATIAL_VOTE_DOMINANCE = 0.6   # cuma balik label kalau mayoritas tetangga >= ini (lihat bawah)
+SPATIAL_VOTE_PASSES = 6        # diulang beberapa kali, longgar per-putaran -- lihat komentar
+                               # di pemanggilannya kenapa ini lebih baik drpd 1x ambang tinggi
 
 # -- parameter deteksi area motif berlian dari render depan --
 EDGE_STD_PATCH = 10       # radius box utk ukur stddev lokal (deteksi garis jahitan)
@@ -91,8 +93,25 @@ DENSITY_RADIUS = 20       # radius box utk ukur "berapa rapat garis jahitan di s
 DENSITY_THRESH = 0.35     # kerapatan di atas ini = garis outline motif berlian
 GAP_CLOSE = 13            # radius dilasi utk nyambungin celah kecil antar segmen garis
                           # sebelum fill-holes (lihat build_pattern_mask_from_render)
+MASK_SMOOTH_SIGMA = 10    # sigma Gaussian blur buat membulatkan sudut blocky hasil
+                          # dilasi/erosi kotak di atas (lihat build_pattern_mask_from_render)
+STRIP_TENDRIL_RADIUS = 23 # radius opening (erosi lalu dilasi) utk motong "juntaian"/tendril
+                          # tipis yang masih NYAMBUNG ke blob utama (makanya lolos dari filter
+                          # ukuran blob -- dihitung 1 komponen besar yang sama). Tendril ini
+                          # yang bikin tepi pattern/main kelihatan "robek kertas" di 3D.
+MAX_EDGE_SUBDIV = 0.0012  # satuan dunia (lihat main()) -- pecah segitiga lebih besar dari ini
+                          # sebelum klasifikasi, biar tepi pattern/main halus bukan blocky
 MIN_PATTERN_BLOB = 20000  # blob hasil klasifikasi lebih kecil dari ini dibuang (bukan panel asli)
-MAX_HOLE_FILL = 2500      # lubang di dalam blob pattern lebih kecil dari ini diisi
+MAX_HOLE_FILL = 45000     # lubang di dalam blob pattern lebih kecil dari ini diisi -- dinaikkan
+                          # jauh drpd semula (2500) krn alur jahitan/lekukan RECESSED di
+                          # DALAM panel berlian (antar tuft) ikut ke-deteksi sbg "garis
+                          # terpisah" yg bikin ratusan lubang kecil-menengah (sampai ~39rb px)
+                          # tersebar di SELURUH interior panel -- inilah sumber noise "robek
+                          # kertas" pas tint diaplikasikan (segitiga di sekitar lekukan jahitan
+                          # itu gampang kepilih acak main/pattern). Lekukan ini bagian dari
+                          # SATU motif berlian yg sama, bukan area "main" terpisah, jadi wajar
+                          # diisi penuh. Komponen "main" asli (headrest, bolster, dll) jauh
+                          # lebih besar dari ini (~2 juta px) jadi aman tidak ikut keisi.
 
 
 def rgb_to_hsv_np(arr):
@@ -169,6 +188,20 @@ def build_pattern_mask_from_render():
         & (np.abs(arr[:, :, 2] - 25) < 6)
         & (local_std < 2)
     )
+    # bg_mask juga nyala di ribuan kantong bayangan KECIL di lekukan motif
+    # berlian (celah antar tuft yang gelap & nyaris rata warnanya -- ikut
+    # memenuhi kriteria "gelap & flat" di atas) -- bukan cuma di area
+    # background asli di sekeliling siluet jok. Kantong kecil ini bikin
+    # obj_mask bolong-bolong di tengah jok (noise "garam-merica" yang
+    # akhirnya ikut keproyeksi ke 3D). Background ASLI itu satu komponen
+    # raksasa yang ngelilingin siluet jok -- jadi cukup ambil komponen
+    # terhubung TERBESAR sbg background, sisanya (kantong bayangan kecil)
+    # dianggap bagian dari objek.
+    bg_lbl, bg_nlab = ndimage.label(bg_mask, structure=np.ones((3, 3)))
+    if bg_nlab > 0:
+        bg_sizes = ndimage.sum(np.ones_like(bg_lbl), bg_lbl, index=np.arange(1, bg_nlab + 1))
+        bg_main = np.argmax(bg_sizes) + 1
+        bg_mask = bg_lbl == bg_main
     obj_mask = ~bg_mask
 
     density = box_filter_sum(edge, DENSITY_RADIUS) / (2 * DENSITY_RADIUS + 1) ** 2
@@ -179,6 +212,26 @@ def build_pattern_mask_from_render():
     closed = ndimage.binary_dilation(lines, structure=np.ones((GAP_CLOSE, GAP_CLOSE)))
     filled = ndimage.binary_fill_holes(closed)
     filled = ndimage.binary_erosion(filled, structure=np.ones((GAP_CLOSE, GAP_CLOSE)))
+
+    # Potong "juntaian"/tendril tipis yang masih nempel di blob utama (garis
+    # jahitan tunggal di bolster/headrest yang KEBETULAN nyambung ke tepi
+    # panel berlian) -- opening (erosi lalu dilasi balik) dgn radius lebih
+    # besar drpd lebar tendril akan memutusnya tanpa mengubah bentuk blob
+    # utama yang solid. Ini beda dari filter ukuran blob di bawah, karena
+    # tendril masih jadi SATU komponen terhubung dgn blob utama (makanya
+    # lolos filter ukuran) -- harus diputus dulu secara geometris.
+    filled = ndimage.binary_opening(
+        filled, structure=np.ones((STRIP_TENDRIL_RADIUS, STRIP_TENDRIL_RADIUS))
+    )
+
+    # Dilasi/erosi pakai kernel KOTAK (np.ones) di atas ninggalin batas yang
+    # blocky/zigzag (siku-siku & gerigi, bukan lengkung halus) -- begitu
+    # diproyeksikan ke 3D jadi kelihatan "robek"/kurang rapi di sepanjang
+    # tepi pattern vs main (lihat screenshot user). Haluskan dengan Gaussian
+    # blur lalu threshold ulang di 0.5 -- cara umum buat membulatkan sudut
+    # mask biner tanpa mengubah luas areanya secara signifikan.
+    filled_f = ndimage.gaussian_filter(filled.astype(np.float32), sigma=MASK_SMOOTH_SIGMA)
+    filled = filled_f > 0.5
     pat = filled & obj_mask
 
     lbl, nlab = ndimage.label(pat, structure=np.ones((3, 3)))
@@ -198,9 +251,16 @@ def build_pattern_mask_from_render():
     return clean, obj_mask
 
 
-DEPTH_TOLERANCE = 0.05  # satuan dunia -- toleransi "dekat permukaan terdepan" per
+DEPTH_TOLERANCE = 0.02  # satuan dunia -- toleransi "dekat permukaan terdepan" per
                          # piksel; harus > relief motif berlian tapi < ketebalan shell
-FACING_THRESH = 0.5      # facing MENTAH harus < ini -- longgar, cuma jaring pengaman
+FACING_THRESH = 0.3      # facing MENTAH harus < ini -- diketatkan lagi dari percobaan
+                         # sebelumnya (0.65, dicoba session lalu, ternyata TERLALU
+                         # longgar) -- sempat bikin ~38% dari segitiga yg lolos tes
+                         # depth justru menghadap agak menjauh dari kamera (facing>0),
+                         # termasuk bagian BAWAH/BELAKANG dudukan jok yang (krn shell
+                         # tipis & DEPTH_TOLERANCE lebar) kebetulan depth-nya nyaris
+                         # sama dgn permukaan depan di piksel yg sama -- hasilnya warna
+                         # bocor ke rangka/bawah jok pas lihat dari belakang.
                          # tambahan di atas depth test (lihat komentar di atas)
 
 
@@ -307,6 +367,20 @@ def main():
     scene = trimesh.load(SRC_GLB, process=False)
     name = list(scene.geometry.keys())[0]
     mesh = scene.geometry[name]
+
+    print("Subdivide segitiga besar (biar batas pattern/main tidak blocky)...")
+    # Klasifikasi di bawah ini kerjanya SATU label per segitiga (sample titik
+    # tengah segitiga, lalu seluruh segitiga ikut label itu) -- cocok kalau
+    # semua segitiga kecil & seragam, tapi mesh hasil Meshy AI ini sangat TIDAK
+    # merata: sebagian besar segitiga kecil, tapi ada ekor segitiga RAKSASA
+    # (99th percentile ~10x median edge length, lihat diagnosa render flat-
+    # color debug -- batas pattern/main yang "robek kertas" ternyata BUKAN
+    # noise klasifikasi, tapi persis mengikuti tepi segitiga BESAR itu). Pecah
+    # dulu segitiga yang lebih besar dari MAX_EDGE_SUBDIV supaya resolusi
+    # klasifikasi cukup halus mengikuti kontur mask 2D yang sudah mulus.
+    mesh = mesh.subdivide_to_size(max_edge=MAX_EDGE_SUBDIV, max_iter=12)
+    print(f"  segitiga setelah subdivide: {len(mesh.faces)}")
+
     uv = mesh.visual.uv
     img = mesh.visual.material.baseColorTexture.convert("RGB")
     arr = np.asarray(img).astype(np.float32)
@@ -344,6 +418,18 @@ def main():
     labels = np.full(n, "leather_main", dtype=object)
     labels[in_pattern_2d] = "leather_pattern"
     labels[green] = "leather_accent"  # warna prioritas di atas motif
+
+    # CATATAN (sempat dicoba, DIBATALKAN): segitiga yg gagal tes "near_front"
+    # pernah diwarisi labelnya dari tetangga 3D terdekat yg lolos tes, dgn
+    # asumsi mereka cuma lekukan relief di permukaan DEPAN yg sama. Ternyata
+    # itu BUKAN sumber "robek kertas" di depan (akar masalahnya ada di
+    # resolusi segitiga -- lihat SUBDIVIDE di atas), dan warisan tetangga-
+    # terdekat ini malah BOCOR ke permukaan BAWAH/BELAKANG dudukan jok (shell
+    # tipis, jadi tetangga 3D terdekat dari sisi bawah bisa jadi permukaan
+    # depan yg searah normal tapi beda sisi) -- kelihatan kalau diputar lihat
+    # dari belakang/bawah. Default polos ke "leather_main" utk segitiga yg
+    # gagal tes (seperti semula) ternyata lebih aman & hasil depannya tetap
+    # bersih berkat subdivide di atas.
 
     for lbl in np.unique(labels):
         c = (labels == lbl).sum()
@@ -385,21 +471,34 @@ def main():
     # tetangga spasial BENAR-BENAR dominan (>=85%) ke label lain; kalau
     # tidak, biarkan label asli (klasifikasi dari proyeksi mask 2D, yang
     # sudah terbukti rapi) apa adanya.
+    # Satu kali voting dgn ambang 85% masih nyisain cukup banyak noise kecil
+    # (kelihatan di live site) -- diulang beberapa KALI dgn ambang lebih
+    # longgar (lihat SPATIAL_VOTE_DOMINANCE) supaya noise terkikis bertahap
+    # tiap putaran, tanpa jatuh ke masalah "voting penuh" (ping-pong/checkerboard)
+    # krn tiap putaran tetap butuh mayoritas yang cukup dominan.
     centroids = mesh.triangles_center
     normals = mesh.face_normals
     tree = cKDTree(centroids)
     _, neighbor_idx = tree.query(centroids, k=SPATIAL_VOTE_K)
     same_side = np.einsum("ij,ikj->ik", normals, normals[neighbor_idx]) > 0
-    neighbor_labels = labels[neighbor_idx]  # (n, k)
     clean = labels.copy()
-    for i in range(n):
-        filt = neighbor_labels[i][same_side[i]]
-        if len(filt) < 6:
-            continue
-        vals, counts = np.unique(filt, return_counts=True)
-        top = np.argmax(counts)
-        if vals[top] != labels[i] and counts[top] / len(filt) >= SPATIAL_VOTE_DOMINANCE:
-            clean[i] = vals[top]
+    for p in range(SPATIAL_VOTE_PASSES):
+        neighbor_labels = clean[neighbor_idx]  # (n, k)
+        new_clean = clean.copy()
+        changed = 0
+        for i in range(n):
+            filt = neighbor_labels[i][same_side[i]]
+            if len(filt) < 6:
+                continue
+            vals, counts = np.unique(filt, return_counts=True)
+            top = np.argmax(counts)
+            if vals[top] != clean[i] and counts[top] / len(filt) >= SPATIAL_VOTE_DOMINANCE:
+                new_clean[i] = vals[top]
+                changed += 1
+        clean = new_clean
+        print(f"  putaran {p+1}: {changed} segitiga berubah label")
+        if changed == 0:
+            break
     for lbl in np.unique(clean):
         c = (clean == lbl).sum()
         print(f"  (bersih) {lbl}: {c} segitiga ({c/n*100:.1f}%)")
