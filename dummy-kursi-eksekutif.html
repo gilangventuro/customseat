@@ -18,14 +18,14 @@
   .notice{background:#2a2410;border-bottom:1px solid #4a3f14;color:#e8c766;font-size:12.5px;padding:8px 20px;text-align:center}
   .notice a{color:#e8c766}
   .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:calc(100vh - 34px)}
-  .stage{position:relative;display:flex;flex-direction:column;background:radial-gradient(ellipse 70% 60% at 50% 45%,#232830,#0f1114);overflow:hidden;min-width:0}
+  .stage{position:relative;display:flex;flex-direction:column;background:linear-gradient(180deg,#e9ebee 0%,#eef0f2 45%,#f8f9fa 100%);color:#14161a;overflow:hidden;min-width:0}
   .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 24px;flex-wrap:wrap}
-  .brand{display:flex;align-items:baseline;gap:10px}
-  .brand b{font-size:20px;font-weight:800;font-style:italic;color:var(--brand);letter-spacing:-.5px}
-  .brand span{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand img{height:28px;width:auto}
+  .brand span{font-size:11px;letter-spacing:2px;color:#6b6f76;text-transform:uppercase}
   .top-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .chip-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;transition:.15s;user-select:none;-webkit-user-select:none}
-  .chip-btn:hover{background:rgba(255,255,255,.12)}
+  .chip-btn{background:rgba(20,22,26,.05);border:1px solid rgba(20,22,26,.12);color:#14161a;border-radius:999px;padding:8px 14px;font-size:13px;cursor:pointer;transition:.15s;user-select:none;-webkit-user-select:none}
+  .chip-btn:hover{background:rgba(20,22,26,.1)}
   .chip-btn.active{background:var(--brand);border-color:var(--brand);color:#06240a}
   .chip-btn.active:hover{background:var(--brand-2)}
   .presets{display:flex;gap:10px;padding:14px 24px;overflow-x:auto;scrollbar-width:thin;border-top:1px solid var(--line);background:rgba(0,0,0,.15);flex:0 0 auto}
@@ -37,10 +37,10 @@
   .preset .dots i:first-child{margin-left:0}
   .view{flex:1;min-height:0;position:relative}
   #view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer}
-  .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted);font-size:14px;pointer-events:none}
-  .spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--brand);animation:spin 1s linear infinite}
+  .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#6b6f76;font-size:14px;pointer-events:none}
+  .spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(20,22,26,.12);border-top-color:var(--brand);animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .progress{font-size:12.5px;color:var(--muted)}
+  .progress{font-size:12.5px;color:#6b6f76}
   .hint{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(0,0,0,.55);border-radius:999px;padding:7px 16px;font-size:12px;color:var(--muted);transition:opacity .4s;pointer-events:none}
   .hint.hide{opacity:0}
   .badge{position:absolute;left:16px;top:16px;display:none;align-items:center;gap:7px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--text);pointer-events:none}
@@ -92,7 +92,7 @@
 <div class="app">
   <section class="stage">
     <div class="topbar">
-      <div class="brand"><b>3D Viewer</b><span>Demo · Preview Model</span></div>
+      <div class="brand"><img src="assets/logo-alldila-seats.png" alt="Alldila Seats"><span>Preview Model</span></div>
       <div class="top-actions">
         <button class="chip-btn" id="btnReset">Reset tampilan</button>
         <button class="chip-btn" id="btnPan">Geser Bebas</button>
@@ -150,7 +150,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 
 const scene = new THREE.Scene();
-const DARK_BG = new THREE.Color(0x14171c);
+const DARK_BG = new THREE.Color(0xeef0f2);
 scene.background = DARK_BG;
 
 /* ---------- interior bus (stilasi) ---------- */
