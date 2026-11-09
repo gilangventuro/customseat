@@ -8,12 +8,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#ffffff; --line:#e6e6e8;
+    --bg:#eef0f2; --line:#e6e6e8;
     --text:#14161a; --muted:#8a8d93; --brand:#2c9d36; --brand-2:#237a2b;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
-  body{background:var(--bg);color:var(--text);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;min-height:100%}
+  body{background:linear-gradient(180deg,#e9ebee 0%,#eef0f2 45%,#f8f9fa 100%);color:var(--text);font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;min-height:100%}
   button{font:inherit;color:inherit}
   .notice{background:#fbf3d9;border-bottom:1px solid #ecd98a;color:#7a5f06;font-size:12.5px;padding:8px 20px;text-align:center}
   .notice a{color:#7a5f06}
@@ -95,7 +95,8 @@ const track = document.getElementById('track');
 const btnPick = document.getElementById('btnPick');
 const stage = document.getElementById('stage');
 
-let centerIndex = 0;
+let centerIndex = MODELS.findIndex(m => m.id === 'kursi-twinseat');
+if (centerIndex < 0) centerIndex = 0;
 const cards = [];
 const sharedModels = {}; // file -> loaded THREE.Object3D (base, for cloning)
 const fbxLoader = new FBXLoader();
