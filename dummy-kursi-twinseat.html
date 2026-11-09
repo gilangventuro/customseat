@@ -336,13 +336,20 @@ function updateFlash(){
 
 function applyColor(key, hex){
   state.c[key] = hex;
-  (matRefs[key]||[]).forEach(m => m.color.set(hex));
+  (matRefs[key]||[]).forEach(m => {
+    if (tintBaseTexture) { m.map = tintBaseTexture; m.needsUpdate = true; }
+    m.color.set(hex);
+  });
   update();
   toast(findPart(key).label+' diubah');
 }
 function resetPart(key){
   delete state.c[key];
-  (matRefs[key]||[]).forEach(m => m.color.set('#'+origHex[key]));
+  (matRefs[key]||[]).forEach((m, i) => {
+    m.map = (origMap[key]||[])[i] || m.map;
+    m.needsUpdate = true;
+    m.color.set('#'+origHex[key]);
+  });
   update();
 }
 function resetAll(){
@@ -384,7 +391,7 @@ function renderPresets(){
     const b = document.createElement('button'); b.className = 'preset';
     const dots = ['main','pattern','accent'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
     b.innerHTML = `<span class="dots">${dots}</span>${pr.name}`;
-    b.onclick = () => { Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => m.color.set(h)); }); update(); toast(pr.name+' diterapkan'); };
+    b.onclick = () => { Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (tintBaseTexture) { m.map = tintBaseTexture; m.needsUpdate = true; } m.color.set(h); }); }); update(); toast(pr.name+' diterapkan'); };
     presetsEl.appendChild(b);
   });
 }
@@ -451,6 +458,24 @@ const draco = new DRACOLoader();
 draco.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
 const loader = new GLTFLoader();
 loader.setDRACOLoader(draco);
+
+/* tekstur kulit ASLI (dari GLB) jauh lebih gelap drpd yg kelihatan, sebab
+   material.color dikalikan (TINT) ke texture, bukan menimpa -- warna apa pun
+   yang dipilih user ikut teredam ke level kegelapan texture aslinya (~18%
+   terang), jadi "Racing Red" pekat malah keluar marun nyaris hitam. Tapi
+   texture asli TIDAK BISA diganti terang begitu saja krn tampilan "warna
+   asli"/sebelum user pilih apa pun juga ikut jadi pucat. Solusinya: siapkan
+   SATU tekstur kedua yang sudah diterangkan (lihat brighten_for_tint di
+   src/split_twin_seats.py) khusus dipakai SAAT user aktif memilih warna --
+   map material ditukar ke versi terang itu cuma selagi ada tint custom,
+   lalu dikembalikan ke map asli saat direset -- lihat applyColor/resetPart. */
+let tintBaseTexture = null;
+new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp', tex => {
+  tex.flipY = false;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tintBaseTexture = tex;
+});
+const origMap = {};
 loader.load('assets/twin-seat-meshy.glb',
   gltf => {
     model = gltf.scene;
@@ -492,7 +517,7 @@ loader.load('assets/twin-seat-meshy.glb',
 
     layoutBus(size, center, box);
 
-    PARTS3D.forEach(p => matRefs[p.key] = []);
+    PARTS3D.forEach(p => { matRefs[p.key] = []; origMap[p.key] = []; });
     model.traverse(n => {
       if (!n.isMesh) return;
       const mats = Array.isArray(n.material) ? n.material : [n.material];
@@ -500,6 +525,7 @@ loader.load('assets/twin-seat-meshy.glb',
         const p = findPartByMat(m.name);
         if (!p) return;
         matRefs[p.key].push(m);
+        origMap[p.key].push(m.map);
         if (origHex[p.key] === undefined) origHex[p.key] = m.color.getHexString();
         if (origEmissive[p.key] === undefined) origEmissive[p.key] = m.emissive.clone();
       });

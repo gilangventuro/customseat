@@ -69,6 +69,15 @@ SRC_GLB = "_tmp_merged_nodraco.glb"
 FRONT_PNG = "_tmp_front.png"
 CAM_JSON = "_tmp_cam.json"
 OUT_GLB = "_tmp_classified.glb"
+TINT_BASE_PNG = "assets/textures/leather-tint-base.webp"  # lihat brighten_for_tint
+
+# -- parameter "terangkan tekstur" biar tint warna customizer tidak gelap --
+BRIGHTEN_LO_PCT = 5      # percentile bawah tekstur asli dipakai sbg acuan "gelap"
+BRIGHTEN_HI_PCT = 90     # percentile atas tekstur asli dipakai sbg acuan "terang"
+                         # (bukan 99/100 -- highlight spekular ekstrem di beberapa
+                         # piksel jangan sampai menekan rentang stretch)
+BRIGHTEN_TARGET_LO = 215  # hasil stretch: piksel paling gelap jadi seterang ini
+BRIGHTEN_TARGET_HI = 255  # & piksel paling terang jadi seterang ini (0-255)
 
 SPATIAL_VOTE_K = 20           # jumlah tetangga spasial (KD-tree) terdekat buat voting
                                # (sebelum difilter same_side, lihat bawah -- perlu agak
@@ -270,6 +279,29 @@ def project_with_depth_tolerance(mesh, cam):
     return px, py, near_front
 
 
+def brighten_for_tint(arr):
+    """Terangkan tekstur asli (kulit hitam gelap, mean cuma ~45/255) supaya
+    tint warna di customizer (material.color dikalikan ke tekstur, lihat
+    dummy-kursi-twinseat.html) tidak selalu jatuh gelap.
+
+    three.js menerapkan warna pilihan user sbg PERKALIAN: hasil = tekstur *
+    warna. Kalau tekstur rata-rata cuma ~18% terang, warna apa pun yang
+    dipilih (termasuk "Racing Red" pekat) ikut teredam jadi ~18% kecerahannya
+    -- itu sebabnya user lihat merah yang dipilih keluar sebagai marun nyaris
+    hitam. Teksturnya sendiri TIDAK BISA diganti warna solid (perlu detail
+    grain/jahitan tetap kelihatan lewat shading), jadi solusinya: regangkan
+    (stretch) rentang kecerahan yang ADA ke pita yang jauh lebih terang &
+    sempit (lihat BRIGHTEN_*), supaya pola shading relatif (alur jahitan
+    lebih gelap, puncak lebih terang) tetap kebaca tapi dasarnya dekat putih
+    -- hasil kali dengan warna pilihan jadi mendekati warna aslinya, bukan
+    teredam parah."""
+    lo = np.percentile(arr, BRIGHTEN_LO_PCT)
+    hi = np.percentile(arr, BRIGHTEN_HI_PCT)
+    stretched = (arr - lo) / max(hi - lo, 1e-6)
+    out = BRIGHTEN_TARGET_LO + stretched * (BRIGHTEN_TARGET_HI - BRIGHTEN_TARGET_LO)
+    return np.clip(out, 0, 255).astype(np.uint8)
+
+
 def main():
     print("Load mesh...")
     scene = trimesh.load(SRC_GLB, process=False)
@@ -279,6 +311,11 @@ def main():
     img = mesh.visual.material.baseColorTexture.convert("RGB")
     arr = np.asarray(img).astype(np.float32)
     H, W = arr.shape[0], arr.shape[1]
+
+    print("Terangkan tekstur dasar (biar tint warna customizer tidak gelap)...")
+    tint_arr = brighten_for_tint(arr)
+    tint_img = Image.fromarray(tint_arr, mode="RGB")
+    print(f"  mean sebelum: {arr.mean(axis=(0,1))}  sesudah: {tint_arr.astype(np.float32).mean(axis=(0,1))}")
 
     print("Hitung warna rata-rata tiap segitiga (buat deteksi list aksen)...")
     face_uv = uv[mesh.faces].mean(axis=1)
@@ -378,6 +415,13 @@ def main():
         # ketiga material supaya exporter glTF simpan 1 salinan gambar saja
         # (bukan 3x) -- tint warna tetap jalan per-material lewat THREE.js
         # material.color di runtime, tidak butuh baseColorTexture terpisah.
+        # PENTING: baseColorTexture di GLB ini HARUS tekstur ASLI (gelap),
+        # bukan tint_img -- supaya tampilan "warna asli" (sebelum user pilih
+        # warna apa pun) tetap sesuai foto produk, bukan pucat/putih. tint_img
+        # (versi diterangkan) diekspor TERPISAH (lihat TINT_BASE_PNG) dan
+        # cuma dipakai dummy-kursi-twinseat.html sbg basis tekstur SAAT user
+        # memilih warna custom (ditukar via material.map saat itu saja) --
+        # lihat penjelasan brighten_for_tint kenapa butuh 2 versi tekstur.
         cluster_mat = trimesh.visual.material.PBRMaterial(
             name=cluster,
             baseColorTexture=src_mat.baseColorTexture,
@@ -396,6 +440,9 @@ def main():
 
     out_scene.export(OUT_GLB, include_normals=True)
     print("Selesai ->", OUT_GLB, f"{os.path.getsize(OUT_GLB)/1e6:.1f} MB")
+
+    tint_img.save(TINT_BASE_PNG)
+    print("Selesai ->", TINT_BASE_PNG)
 
 
 if __name__ == "__main__":
