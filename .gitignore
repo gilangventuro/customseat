@@ -1,2 +1,6 @@
 .vercel
 .env*
+
+# file sementara pipeline split_twin_seats (regenerable)
+_tmp_*.glb
+_test_classify.html
