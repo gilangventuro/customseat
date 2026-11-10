@@ -5,3 +5,4 @@
 _tmp_*
 _test_classify.html
 __pycache__/
+*.blend1

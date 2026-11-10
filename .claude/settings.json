@@ -1,0 +1,16 @@
+{
+  "env": {
+    "MAX_THINKING_TOKENS": "10000",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
+    "MCP_TIMEOUT": "60000",
+    "ANTHROPIC_BASE_URL": "https://omniroute-yulianto.venturo.id/v1",
+    "ANTHROPIC_AUTH_TOKEN": "sk-2b203fa3f96761c2-e849f6-95ca30ea"
+  },
+  "model": "cc/claude-sonnet-5-5",
+  "enabledMcpjsonServers": ["sentry"],
+  "permissions": { "allow": ["Bash(bash posting.sh*)"] }
+}
