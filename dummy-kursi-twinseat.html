@@ -243,7 +243,7 @@ function setStudio(on){
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
 camera.position.set(220, 160, 260);
 
-const hemi = new THREE.HemisphereLight(0xffffff, 0x3a3f48, 1.2);
+const hemi = new THREE.HemisphereLight(0xffffff, 0xb8bcc6, 1.8);
 scene.add(hemi);
 const key = new THREE.DirectionalLight(0xffffff, 1.6);
 key.position.set(200, 300, 150);
@@ -254,6 +254,14 @@ scene.add(fill);
 const back = new THREE.DirectionalLight(0xffffff, 1.0);
 back.position.set(0, 250, -300);
 scene.add(back);
+/* lampu menempel di kamera: kursi (kulit hitam) tetap terang dari sisi belakang, atas, maupun bawah */
+const headlight = new THREE.DirectionalLight(0xffffff, 1.6);
+headlight.position.set(0, 0, 1);
+camera.add(headlight);
+scene.add(camera);
+const topLight = new THREE.DirectionalLight(0xffffff, 1.0);
+topLight.position.set(0, 400, 0);
+scene.add(topLight);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
