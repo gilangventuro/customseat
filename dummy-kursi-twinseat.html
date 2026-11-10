@@ -64,6 +64,13 @@
   .part-body{display:none;padding:2px 12px 14px}
   .part.open .part-body{display:block}
   .desc{color:var(--muted);font-size:12px;margin:0 0 10px}
+  .sw-combo{width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.15);flex:0 0 auto;display:flex;overflow:hidden;box-shadow:inset 0 -6px 10px rgba(0,0,0,.25)}
+  .sw-combo i{flex:1}
+  .reco-list{display:grid;gap:6px}
+  .reco-item{display:flex;align-items:center;gap:12px;width:100%;background:rgba(255,255,255,.03);border:1px solid transparent;border-radius:12px;padding:8px 10px;cursor:pointer;text-align:left;color:inherit;font:inherit;transition:.15s}
+  .reco-item:hover{background:rgba(255,255,255,.07)}
+  .reco-item.sel{border-color:var(--brand);background:rgba(63,191,74,.12)}
+  .reco-item b{font-size:13px}
   .grid{display:grid;grid-template-columns:repeat(8,1fr);gap:7px}
   .sw{aspect-ratio:1;border-radius:9px;border:1px solid rgba(255,255,255,.15);cursor:pointer;padding:0;transition:transform .1s}
   .sw:hover{transform:scale(1.08)}
@@ -383,15 +390,40 @@ function renderParts(){
     ti.onchange = e => { let v = e.target.value.trim(); if(v && !v.startsWith('#')) v = '#'+v; if(/^#[0-9a-f]{6}$/i.test(v)) applyColor(p.key, v.toLowerCase()); else e.target.value = (hex||'').toUpperCase(); };
     partsEl.appendChild(el);
   });
+  renderReco();
 }
 const presetsEl = document.getElementById('presets');
+function applyPreset(pr){
+  Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (tintBaseTexture) { m.map = tintBaseTexture; m.needsUpdate = true; } m.color.set(h); }); });
+  update(); toast(pr.name+' diterapkan');
+}
+const presetMatch = pr => Object.keys(pr.c).every(k => pr.c[k]===state.c[k]);
+function renderReco(){
+  const open = state.open === 'reco';
+  const cur = PRESETS3D.find(presetMatch);
+  const el = document.createElement('div'); el.className = 'part'+(open?' open':'');
+  const combo = pr => ['main','pattern','accent'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
+  el.innerHTML = `<button class="part-row"><span class="sw-combo">${combo(cur||PRESETS3D[0])}</span>
+    <span class="t"><b>Rekomendasi Warna</b><small>${cur?cur.name:PRESETS3D.length+' kombinasi'}</small></span>
+    <svg class="chev" width="16" height="16" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
+    <div class="part-body"><p class="desc">Kombinasi warna siap pakai untuk Kulit Utama, Motif Berlian & List Aksen</p><div class="reco-list"></div></div>`;
+  el.querySelector('.part-row').onclick = () => { state.open = open ? null : 'reco'; renderParts(); };
+  const list = el.querySelector('.reco-list');
+  PRESETS3D.forEach(pr => {
+    const b = document.createElement('button'); b.className = 'reco-item'+(pr===cur?' sel':'');
+    b.innerHTML = `<span class="sw-combo">${combo(pr)}</span><b>${pr.name}</b>`;
+    b.onclick = () => applyPreset(pr);
+    list.appendChild(b);
+  });
+  partsEl.appendChild(el);
+}
 function renderPresets(){
   presetsEl.innerHTML = '';
   PRESETS3D.forEach(pr => {
     const b = document.createElement('button'); b.className = 'preset';
     const dots = ['main','pattern','accent'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
     b.innerHTML = `<span class="dots">${dots}</span>${pr.name}`;
-    b.onclick = () => { Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (tintBaseTexture) { m.map = tintBaseTexture; m.needsUpdate = true; } m.color.set(h); }); }); update(); toast(pr.name+' diterapkan'); };
+    b.onclick = () => applyPreset(pr);
     presetsEl.appendChild(b);
   });
 }
