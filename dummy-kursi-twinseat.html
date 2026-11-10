@@ -113,7 +113,6 @@
       <div class="hint" id="hint">Klik bagian kursi untuk pilih warna · drag untuk putar · scroll untuk zoom · "Geser Bebas" untuk geser tampilan</div>
       <div class="badge" id="badge"><span class="dot"></span>Alldila Seats · Preview Interior Bus</div>
     </div>
-    <div class="presets" id="presets"></div>
   </section>
 
   <aside class="panel">
@@ -392,7 +391,6 @@ function renderParts(){
   });
   renderReco();
 }
-const presetsEl = document.getElementById('presets');
 function applyPreset(pr){
   Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (tintBaseTexture) { m.map = tintBaseTexture; m.needsUpdate = true; } m.color.set(h); }); });
   update(); toast(pr.name+' diterapkan');
@@ -417,23 +415,7 @@ function renderReco(){
   });
   partsEl.appendChild(el);
 }
-function renderPresets(){
-  presetsEl.innerHTML = '';
-  PRESETS3D.forEach(pr => {
-    const b = document.createElement('button'); b.className = 'preset';
-    const dots = ['main','pattern','accent'].map(k => `<i style="background:${pr.c[k]}"></i>`).join('');
-    b.innerHTML = `<span class="dots">${dots}</span>${pr.name}`;
-    b.onclick = () => applyPreset(pr);
-    presetsEl.appendChild(b);
-  });
-}
-function markPreset(){
-  [...presetsEl.children].forEach((b,i) => {
-    const pr = PRESETS3D[i].c;
-    b.classList.toggle('active', Object.keys(pr).every(k => pr[k]===state.c[k]));
-  });
-}
-function update(){ renderParts(); markPreset(); }
+function update(){ renderParts(); }
 
 function selectPart(key){
   state.open = key;
@@ -565,7 +547,6 @@ loader.load('assets/twin-seat-meshy.glb',
 
     overlay.style.display = 'none';
     renderParts();
-    renderPresets();
   },
   xhr => {
     if (xhr.lengthComputable) {
