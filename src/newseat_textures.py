@@ -5,6 +5,14 @@ Image.MAX_IMAGE_PIXELS=None
 d=sys.argv[1]; pre=sys.argv[2]; out=sys.argv[3]
 base=Image.open(f'{d}/{pre}.png').convert('RGB')
 b4=base.resize((4096,4096),Image.LANCZOS)
+# warna default: panel cokelat jadi hitam (detail jahitan tetap), langsung di-bake ke tekstur
+A=np.asarray(b4).astype(float); r,g,b=A[...,0],A[...,1],A[...,2]
+msk=(((r-b)>=6)&(r>g)).astype(np.uint8)*255
+msk=np.asarray(Image.fromarray(msk).filter(ImageFilter.GaussianBlur(2))).astype(float)/255
+Lm=0.299*r+0.587*g+0.114*b
+gray=np.stack([Lm*0.72,Lm*0.70,Lm*0.71],-1)
+A=A*(1-msk[...,None])+gray*msk[...,None]
+b4=Image.fromarray(np.clip(A,0,255).astype(np.uint8))
 b4.save(f'{out}/_tmp_base4k.jpg',quality=88)
 nm=Image.open(f'{d}/{pre}_normal.png').convert('RGB').resize((2048,2048),Image.LANCZOS)
 nm.save(f'{out}/_tmp_normal2k.jpg',quality=88)
