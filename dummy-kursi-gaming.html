@@ -98,7 +98,6 @@
         <button class="chip-btn" id="btnPan">Geser Bebas</button>
         <button class="chip-btn" id="btnDetachBody">Lepas Bantalan</button>
         <button class="chip-btn" id="btnDetachLegs">Lepas Kaki</button>
-        <button class="chip-btn" id="btnStudio">Interior Bus</button>
         <button class="chip-btn" id="btnFull">Layar penuh</button>
       </div>
     </div>
@@ -537,7 +536,6 @@ document.getElementById('btnFull').onclick = () => {
 };
 document.getElementById('btnDetachBody').onclick = e => toggleDetach('bantalan', e.target);
 document.getElementById('btnDetachLegs').onclick = e => toggleDetach('kaki', e.target);
-document.getElementById('btnStudio').onclick = e => { setStudio(!state.studio); e.currentTarget.classList.toggle('active', state.studio); };
 document.getElementById('btnPan').onclick = e => { setPanMode(!panMode); e.currentTarget.classList.toggle('active', panMode); };
 
 (function loop(){

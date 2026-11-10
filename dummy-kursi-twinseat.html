@@ -103,7 +103,6 @@
       <div class="top-actions">
         <button class="chip-btn" id="btnReset">Reset tampilan</button>
         <button class="chip-btn" id="btnPan">Geser Bebas</button>
-        <button class="chip-btn" id="btnStudio">Interior Bus</button>
         <button class="chip-btn" id="btnFull">Layar penuh</button>
       </div>
     </div>
@@ -513,8 +512,8 @@ loader.load('assets/twin-seat-meshy.glb',
     model.position.sub(center);
 
     const radius = Math.max(size.x, size.y, size.z) * 0.5 || 100;
-    const dist = radius / Math.sin((camera.fov * Math.PI/180) / 2) * 1.15;
-    camera.position.set(dist*0.55, dist*0.45, dist*0.75);
+    const dist = radius / Math.sin((camera.fov * Math.PI/180) / 2) * 1.36;
+    camera.position.set(dist*0.48, dist*0.42, dist*0.84);
     camera.near = radius/100; camera.far = radius*50;
     camera.updateProjectionMatrix();
     /* model ini (hasil export Blender/glTF) berskala meter (chair ~0.1 unit),
@@ -572,7 +571,6 @@ document.getElementById('btnReset').onclick = () => {
 document.getElementById('btnFull').onclick = () => {
   document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
 };
-document.getElementById('btnStudio').onclick = e => { setStudio(!state.studio); e.currentTarget.classList.toggle('active', state.studio); };
 document.getElementById('btnPan').onclick = e => { setPanMode(!panMode); e.currentTarget.classList.toggle('active', panMode); };
 
 (function loop(){

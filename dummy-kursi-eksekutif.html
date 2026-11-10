@@ -96,7 +96,6 @@
       <div class="top-actions">
         <button class="chip-btn" id="btnReset">Reset tampilan</button>
         <button class="chip-btn" id="btnPan">Geser Bebas</button>
-        <button class="chip-btn" id="btnStudio">Interior Bus</button>
         <button class="chip-btn" id="btnFull">Layar penuh</button>
       </div>
     </div>
@@ -521,7 +520,6 @@ document.getElementById('btnReset').onclick = () => {
 document.getElementById('btnFull').onclick = () => {
   document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
 };
-document.getElementById('btnStudio').onclick = e => { setStudio(!state.studio); e.currentTarget.classList.toggle('active', state.studio); };
 document.getElementById('btnPan').onclick = e => { setPanMode(!panMode); e.currentTarget.classList.toggle('active', panMode); };
 
 (function loop(){
