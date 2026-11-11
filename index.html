@@ -31,7 +31,7 @@
   .card canvas{width:100%;flex:1;display:block;pointer-events:none}
   .card.center canvas{pointer-events:auto;cursor:grab;touch-action:none}
   .card.center canvas:active{cursor:grabbing}
-  .card .name{text-align:center;font-size:14px;font-weight:700;margin-top:6px}
+  .card .name{display:none;text-align:center;font-size:14px;font-weight:700;margin-top:6px}
   .card .name small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:2px}
 
   .stage{padding-bottom:12px}
@@ -44,21 +44,22 @@
   .side{position:absolute;top:50%;left:calc(50% + 285px);width:min(340px,calc(50vw - 300px));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
   .specs{pointer-events:none;
     transform-origin:0 50%;transform:translateX(-190px) scale(.03,.42);opacity:0;
-    transition:transform .75s cubic-bezier(.2,1.25,.35,1),opacity .3s ease;
+    transition:transform .1s ease-in,opacity .1s ease-in;
     background:radial-gradient(120% 70% at 0% 0%,rgba(46,160,67,.30),rgba(46,160,67,0) 60%),radial-gradient(90% 60% at 100% 100%,rgba(90,160,255,.22),rgba(90,160,255,0) 65%),linear-gradient(160deg,rgba(255,255,255,.72),rgba(255,255,255,.38));
     -webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);
     border:1px solid rgba(255,255,255,.75);border-radius:26px;
     box-shadow:0 24px 50px -22px rgba(30,50,80,.38),inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(255,255,255,.35);overflow:hidden}
-  .specs.show{transform:none;opacity:1}
-  .cta{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+  .specs.show{transform:none;opacity:1;transition:transform .75s cubic-bezier(.2,1.25,.35,1),opacity .3s ease}
+  .cta{transform-origin:0 50%;transform:translateX(-190px) scale(.03,.42);opacity:0;pointer-events:none;transition:transform .1s ease-in,opacity .1s ease-in;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+  .cta.show{transform:none;opacity:1;pointer-events:auto;transition:transform .6s cubic-bezier(.2,1.25,.35,1) .3s,opacity .3s ease .3s}
   .cta .btn-pick{margin-top:0;width:100%}
   .cta .hint{margin-top:6px}
   .specs h3{margin:0;padding:22px 24px 6px;font-size:21px;font-weight:700;letter-spacing:-.2px}
   .specs ul{list-style:none;margin:0;padding:6px 24px 14px}
   .specs li{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid rgba(60,70,90,.09);font-size:13px;
-    opacity:0;transform:translateX(-10px);transition:opacity .4s ease,transform .4s ease}
+    opacity:0;transform:translateX(-10px);transition:opacity .1s ease,transform .1s ease}
   .specs li:last-child{border-bottom:0}
-  .specs.show li{opacity:1;transform:none}
+  .specs.show li{opacity:1;transform:none;transition:opacity .4s ease var(--d),transform .4s ease var(--d)}
   .specs li svg{width:18px;height:18px;flex:0 0 auto;stroke:#4a4e55;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
   .specs li .k{color:#3a3d43;flex:1}
   .specs li .v{font-weight:600;text-align:right;color:var(--text)}
@@ -335,20 +336,20 @@ MODELS.find(m => m.id === 'kursi-twinseat').specs = [
   { icon:'finish',  k:'Finishing',     v:'Emboss / Quilted' },
   { icon:'size',    k:'Dimensi',       v:'120 × 85 cm' }
 ];
-const specsEl = document.getElementById('specs');
+const specsEl = document.getElementById('specs'), ctaEl = document.querySelector('.cta');
 let specsTimer = null, specsFor = null;
 function updateSpecs(delay){
   const m = cards[centerIndex].model;
   clearTimeout(specsTimer);
-  if (!m.specs) { specsEl.classList.remove('show'); specsFor = null; return; }
+  if (!m.specs) { specsEl.classList.remove('show'); specsFor = null; specsTimer = setTimeout(() => ctaEl.classList.add('show'), delay); return; }
   if (specsFor === m.id && specsEl.classList.contains('show')) return;
-  specsEl.classList.remove('show');
+  specsEl.classList.remove('show'); ctaEl.classList.remove('show');
   specsTimer = setTimeout(() => {
     specsEl.innerHTML = `<h3>${m.name}</h3><ul>` + m.specs.map((r, i) =>
-      `<li style="transition-delay:${0.35 + i * 0.07}s">${ICONS[r.icon]}<span class="k">${r.k}</span><span class="v">${r.v}</span></li>`).join('') + '</ul>';
+      `<li style="--d:${0.35 + i * 0.07}s">${ICONS[r.icon]}<span class="k">${r.k}</span><span class="v">${r.v}</span></li>`).join('') + '</ul>';
     specsFor = m.id;
     void specsEl.offsetWidth;            /* paksa reflow supaya animasi mulai dari kondisi gepeng */
-    specsEl.classList.add('show');
+    specsEl.classList.add('show'); ctaEl.classList.add('show');
   }, delay);
 }
 
