@@ -38,6 +38,24 @@
   .btn-pick:hover{background:var(--brand-2)}
   .hint{font-size:11.5px;color:var(--muted);margin-top:10px}
 
+
+  /* ---------- panel spesifikasi: muncul dari belakang kursi (gepeng -> mekar) ---------- */
+  .specs{position:absolute;top:50%;left:calc(50% + 285px);width:min(340px,calc(50vw - 300px));z-index:5;pointer-events:none;
+    transform-origin:0 50%;transform:translateY(-52%) translateX(-190px) scale(.03,.42);opacity:0;
+    transition:transform .75s cubic-bezier(.2,1.25,.35,1),opacity .3s ease;
+    background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px -18px rgba(20,22,26,.28),0 2px 6px rgba(20,22,26,.05);overflow:hidden}
+  .specs.show{transform:translateY(-52%) translateX(0) scale(1,1);opacity:1}
+  .specs h3{margin:0;padding:14px 20px;font-size:13.5px;font-weight:700;background:#f1f2f4;border-bottom:1px solid var(--line);letter-spacing:.2px}
+  .specs ul{list-style:none;margin:0;padding:4px 20px 8px}
+  .specs li{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #f0f0f2;font-size:13px;
+    opacity:0;transform:translateX(-10px);transition:opacity .4s ease,transform .4s ease}
+  .specs li:last-child{border-bottom:0}
+  .specs.show li{opacity:1;transform:none}
+  .specs li svg{width:18px;height:18px;flex:0 0 auto;stroke:#4a4e55;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .specs li .k{color:#3a3d43;flex:1}
+  .specs li .v{font-weight:600;text-align:right;color:var(--text)}
+  @media (max-width:1000px){ .specs{display:none} }
+
   @media (max-width:640px){
     .card{width:320px}
   }
@@ -49,6 +67,7 @@
 
   <div class="stage" id="stage">
     <div class="track" id="track"></div>
+    <aside class="specs" id="specs" aria-label="Spesifikasi"></aside>
   </div>
 
   <div class="footer">
@@ -256,9 +275,45 @@ function layout(){
   requestAnimationFrame(() => cards.forEach(resizeViewer));
 }
 
+
+/* ---------- spesifikasi model (muncul dari belakang kursi saat model dipilih) ---------- */
+const ICONS = {
+  seat:'<svg viewBox="0 0 24 24"><path d="M6 11V7a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v4"/><path d="M4 12a2 2 0 0 1 2 2v2h12v-2a2 2 0 1 1 4 0v4H2v-4a2 2 0 0 1 2-2z"/><path d="M5 20v1.5M19 20v1.5"/></svg>',
+  leather:'<svg viewBox="0 0 24 24"><path d="M12 3 3 7.5l9 4.5 9-4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/></svg>',
+  frame:'<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>',
+  stitch:'<svg viewBox="0 0 24 24"><path d="M4 8h3M10 8h4M17 8h3M4 16h3M10 16h4M17 16h3"/><path d="M8.5 4v8M15.5 12v8"/></svg>',
+  finish:'<svg viewBox="0 0 24 24"><path d="M12 3l2.2 5.3L20 10l-5.8 1.7L12 17l-2.2-5.3L4 10l5.8-1.7z"/><path d="M19 16v4M17 18h4"/></svg>',
+  size:'<svg viewBox="0 0 24 24"><path d="m14 4 6 6L10 20l-6-6z"/><path d="m8 10 2 2M11 7l2 2M5 13l2 2"/></svg>'
+};
+MODELS.find(m => m.id === 'kursi-twinseat').specs = [
+  { icon:'seat',    k:'Konfigurasi',   v:'2 Seat' },
+  { icon:'leather', k:'Material Cover', v:'Synthetic Leather' },
+  { icon:'frame',   k:'Rangka',        v:'Metal Frame' },
+  { icon:'stitch',  k:'Jahitan',       v:'Premium Stitching' },
+  { icon:'finish',  k:'Finishing',     v:'Emboss / Quilted' },
+  { icon:'size',    k:'Dimensi',       v:'120 × 85 cm' }
+];
+const specsEl = document.getElementById('specs');
+let specsTimer = null, specsFor = null;
+function updateSpecs(delay){
+  const m = cards[centerIndex].model;
+  clearTimeout(specsTimer);
+  if (!m.specs) { specsEl.classList.remove('show'); specsFor = null; return; }
+  if (specsFor === m.id && specsEl.classList.contains('show')) return;
+  specsEl.classList.remove('show');
+  specsTimer = setTimeout(() => {
+    specsEl.innerHTML = '<h3>Spesifikasi</h3><ul>' + m.specs.map((r, i) =>
+      `<li style="transition-delay:${0.35 + i * 0.07}s">${ICONS[r.icon]}<span class="k">${r.k}</span><span class="v">${r.v}</span></li>`).join('') + '</ul>';
+    specsFor = m.id;
+    void specsEl.offsetWidth;            /* paksa reflow supaya animasi mulai dari kondisi gepeng */
+    specsEl.classList.add('show');
+  }, delay);
+}
+
 function setCenter(i){
   centerIndex = ((i % cards.length) + cards.length) % cards.length;
   layout();
+  updateSpecs(520);
 }
 
 /* ---------- pilih model: klik kartu di samping, atau geser (drag) dengan kursor ---------- */
@@ -291,6 +346,7 @@ btnPick.onclick = () => {
 };
 
 layout();
+updateSpecs(900);
 
 /* ---------- model dibiarkan diam di sudut awal, tidak auto-rotate ---------- */
 function renderAll(){
