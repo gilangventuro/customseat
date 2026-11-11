@@ -63,7 +63,15 @@
   .specs li svg{width:18px;height:18px;flex:0 0 auto;stroke:#4a4e55;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
   .specs li .k{color:#3a3d43;flex:1}
   .specs li .v{font-weight:600;text-align:right;color:var(--text)}
-  @media (max-width:1000px){ .specs{display:none} .side{left:50%;top:auto;bottom:10px;width:min(340px,90vw);transform:translateX(-50%)} }
+  /* mobile / layar sempit: kartu di bawah model, animasi tumbuh dari atas ke bawah */
+  @media (max-width:1000px){
+    .stage{flex:none;display:block;overflow:hidden;padding-bottom:24px}
+    .track{height:340px}
+    .card{height:100%}
+    .side{position:relative;left:auto;top:auto;transform:none;width:min(360px,90vw);margin:6px auto 0}
+    .specs,.cta{transform-origin:50% 0;transform:translateY(-30px) scale(.9,.03)}
+    .specs li{padding:10px 0}
+  }
 
   @media (max-width:640px){
     .card{width:320px}
