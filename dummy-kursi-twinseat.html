@@ -19,8 +19,9 @@
   .notice a{color:#e8c766}
   .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100vh;padding:14px;gap:14px;box-sizing:border-box;background:radial-gradient(520px 420px at 100% 12%,rgba(63,191,74,.22),transparent 70%),radial-gradient(480px 380px at 92% 88%,rgba(120,140,170,.22),transparent 70%),linear-gradient(180deg,#e9ebee 0%,#eef0f2 45%,#f8f9fa 100%)}
   .stage{position:relative;display:flex;flex-direction:column;background:transparent;color:#14161a;overflow:hidden;min-width:0}
-  .topbar{position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .topbar{pointer-events:none;position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
   .topbar{padding:14px 18px}
+  .topbar > *{pointer-events:auto}
   .brand{display:flex;align-items:flex-end;gap:10px;line-height:1}
   .brand img{height:28px;width:auto;display:block}
   .brand span{font-size:11px;letter-spacing:2px;color:#6b6f76;text-transform:uppercase;line-height:1;display:block;margin-bottom:2px}
@@ -40,7 +41,8 @@
   .preset .dots i{width:18px;height:18px;border-radius:50%;border:2px solid #1b1e23;margin-left:-6px}
   .preset .dots i:first-child{margin-left:0}
   .view{flex:1;min-height:0;position:relative}
-  #view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer}
+  /* canvas memenuhi seluruh jendela (tanpa kotak): kursi bisa meluas ke belakang navbar & panel */
+  #view{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;display:block;touch-action:none;cursor:pointer}
   .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#6b6f76;font-size:14px;pointer-events:none}
   .spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(20,22,26,.12);border-top-color:var(--brand);animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -104,6 +106,7 @@
   @media (max-width:900px){
     .app{grid-template-columns:1fr;height:auto;padding:10px;gap:10px}
     .view{min-height:60vh}
+    #view{position:absolute;inset:0;width:100%;height:100%;z-index:auto}
     .topbar{padding:14px 16px;border-radius:22px}
   }
 </style>
@@ -295,10 +298,16 @@ function setPanMode(on){
 }
 
 function resize(){
-  const w = stage.clientWidth, h = stage.clientHeight;
+  const full = !matchMedia('(max-width:900px)').matches;
+  const w = full ? innerWidth : stage.clientWidth, h = full ? innerHeight : stage.clientHeight;
   renderer.setSize(w, h, false);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   camera.aspect = w / h;
+  if (full) {
+    /* geser pusat gambar ke tengah area kiri (di luar panel) & di bawah navbar */
+    const panelW = document.querySelector('.panel').getBoundingClientRect().width + 28;
+    camera.setViewOffset(w, h, panelW / 2, -40, w, h);
+  } else camera.clearViewOffset();
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
