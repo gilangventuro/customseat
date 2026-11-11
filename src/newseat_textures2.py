@@ -3,6 +3,7 @@ from PIL import Image, ImageFilter
 import numpy as np, sys
 from scipy.ndimage import gaussian_filter
 Image.MAX_IMAGE_PIXELS=None
+ACC_R,ACC_G,ACC_B=[float(x) for x in (sys.argv[3].split(',') if len(sys.argv)>3 else '28,68,68'.split(','))]
 d=sys.argv[1]; pre=sys.argv[2]
 T=np.load('_tmp_texlabel.npy'); R=4096
 base=Image.open(f'{d}/{pre}.png').convert('RGB').resize((R,R),Image.LANCZOS)
@@ -19,6 +20,11 @@ mean_p=L[pat].mean(); out_p=np.clip(31+(L-mean_p),6,120)
 out[pat]=np.stack([out_p*1.03,out_p*0.99,out_p],-1)[pat]
 # kulit utama: netralkan sisa rona hijau/cokelat
 gm=np.stack([L*1.03,L*0.99,L],-1); out[main]=gm[main]
+# list aksen: toska merata (warna default pilihan user), detail relief tetap
+acc=Tf==2
+ACC=np.array([ACC_R,ACC_G,ACC_B],np.float32)
+la=L[acc]; k=np.clip(L/ (np.percentile(la,50)+1e-6),0.5,1.6)
+out[acc]=(ACC[None,:]*k[acc][:,None])
 Image.fromarray(np.clip(out,0,255).astype(np.uint8)).save('_tmp_base4k.jpg',quality=88)
 # tint-base: normalisasi per kelas berdasar peta label (2048)
 H=2048; Ts=np.asarray(Image.fromarray(Tf).resize((H,H),Image.NEAREST))
