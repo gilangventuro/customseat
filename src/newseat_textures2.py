@@ -1,0 +1,36 @@
+# Tekstur diselaraskan dgn label face: panel jadi hitam seragam, tint-base per kelas memakai peta label per-texel.
+from PIL import Image, ImageFilter
+import numpy as np, sys
+from scipy.ndimage import gaussian_filter
+Image.MAX_IMAGE_PIXELS=None
+d=sys.argv[1]; pre=sys.argv[2]
+T=np.load('_tmp_texlabel.npy'); R=4096
+base=Image.open(f'{d}/{pre}.png').convert('RGB').resize((R,R),Image.LANCZOS)
+A=np.asarray(base).astype(np.float32); r,g,b=A[...,0],A[...,1],A[...,2]
+L=0.299*r+0.587*g+0.114*b
+# fallback texel tak terlabel: aturan kroma lama (cokelat -> pola)
+Tf=T.copy()
+chroma_pat=((r-b)>=6)&(r>g)
+Tf=np.where(T==255,np.where(chroma_pat,1,0),T).astype(np.uint8)
+out=A.copy()
+pat=Tf==1; main=Tf==0
+# panel: seragam hitam, detail jahitan dipertahankan (hp) -> tidak ada sisa hijau/cokelat
+mean_p=L[pat].mean(); out_p=np.clip(31+(L-mean_p),6,120)
+out[pat]=np.stack([out_p*1.03,out_p*0.99,out_p],-1)[pat]
+# kulit utama: netralkan sisa rona hijau/cokelat
+gm=np.stack([L*1.03,L*0.99,L],-1); out[main]=gm[main]
+Image.fromarray(np.clip(out,0,255).astype(np.uint8)).save('_tmp_base4k.jpg',quality=88)
+# tint-base: normalisasi per kelas berdasar peta label (2048)
+H=2048; Ts=np.asarray(Image.fromarray(Tf).resize((H,H),Image.NEAREST))
+Ls=np.asarray(Image.fromarray(L.astype(np.float32)).resize((H,H),Image.BOX)).astype(np.float64)
+W=np.stack([np.asarray(Image.fromarray(((Ts==c)*255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2))).astype(float)/255 for c in range(4)],0)
+W/=W.sum(0,keepdims=True)+1e-6
+AMP={0:0.045,1:0.06,2:0.09,3:0.09}; tint=np.zeros((H,H))
+for c in range(4):
+    sel=Ts==c
+    if sel.sum()<10: continue
+    p50=np.percentile(Ls[sel],50); Lc=np.where(sel,Ls,p50)
+    hp=Lc-gaussian_filter(Lc,10); hp=np.clip(hp/(hp[sel].std()+1e-6),-3,2)
+    tint+=W[c]*np.clip(0.88+AMP[c]*hp,0.55,1.0)
+Image.fromarray(np.clip(tint*255,0,255).astype(np.uint8)).resize((R,R),Image.BICUBIC).convert('RGB').save('_tmp_tint4k.webp',quality=82)
+print('ok')
