@@ -35,8 +35,9 @@ AMP={0:0.045,1:0.06,2:0.09,3:0.09}; tint=np.zeros((H,H))
 for c in range(4):
     sel=Ts==c
     if sel.sum()<10: continue
-    p50=np.percentile(Ls[sel],50); Lc=np.where(sel,Ls,p50)
-    hp=Lc-gaussian_filter(Lc,10); hp=np.clip(hp/(hp[sel].std()+1e-6),-3,2)
+    m=sel.astype(np.float64); Lm=np.where(sel,Ls,0.0)
+    lowp=gaussian_filter(Lm,10)/(gaussian_filter(m,10)+1e-6)   # blur ber-mask: tidak bocor lewat tepi pulau UV
+    hp=np.where(sel,Ls-lowp,0.0); hp=np.clip(hp/(hp[sel].std()+1e-6),-2,2)
     tint+=W[c]*np.clip(0.88+AMP[c]*hp,0.55,1.0)
 Image.fromarray(np.clip(tint*255,0,255).astype(np.uint8)).resize((R,R),Image.BICUBIC).convert('RGB').save('_tmp_tint4k.webp',quality=82)
 print('ok')
