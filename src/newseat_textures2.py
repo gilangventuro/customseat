@@ -31,6 +31,21 @@ acc=Tf==2
 ACC=np.array([ACC_R,ACC_G,ACC_B],np.float32)
 la=L[acc]; k=np.clip(L/ (np.percentile(la,50)+1e-6),0.5,1.6)
 out[acc]=(ACC[None,:]*k[acc][:,None])
+# ujung tuas putih -> merah (wajah dipilih di _tmp_whitetip.npy, warna merah diambil dari badan tuas)
+import os
+if os.path.exists('_tmp_whitetip.npy'):
+    from PIL import ImageDraw
+    UVL=np.load('_tmp_uvl.npy'); wf=np.load('_tmp_whitetip.npy'); rf=np.load('_tmp_red.npy')
+    mk=Image.new('L',(R,R),0); dr=ImageDraw.Draw(mk)
+    for f in wf: dr.polygon([(float(u%1*(R-1)),float((1-v)%1*(R-1))) for u,v in UVL[f]],fill=255)
+    mk=np.asarray(mk.filter(ImageFilter.MaxFilter(3)))>0
+    mr=Image.new('L',(R,R),0); dr=ImageDraw.Draw(mr)
+    for f in np.where(rf)[0]: dr.polygon([(float(u%1*(R-1)),float((1-v)%1*(R-1))) for u,v in UVL[f]],fill=255)
+    mr=np.asarray(mr)>0
+    redc=np.median(A[mr],0); redL=np.median(L[mr])
+    kk=np.clip(L/(np.median(L[mk])+1e-6),0.6,1.15)
+    out[mk]=np.clip(redc[None,:]*kk[mk][:,None]*0.95,0,255)
+    print('tip recolor',mk.sum(),redc)
 Image.fromarray(np.clip(out,0,255).astype(np.uint8)).save('_tmp_base4k.jpg',quality=88)
 # tint-base: normalisasi per kelas berdasar peta label (2048)
 H=2048; Ts=np.asarray(Image.fromarray(Tf).resize((H,H),Image.NEAREST))
