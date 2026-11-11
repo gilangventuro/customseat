@@ -26,6 +26,7 @@
   .stage.dragging{cursor:grabbing}
   .track{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
   .card{position:absolute;width:588px;max-width:92vw;height:95%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;transition:transform .45s cubic-bezier(.22,.8,.3,1),opacity .45s,filter .45s;user-select:none;cursor:pointer}
+  .stage.orbiting .card{transition:none}
   .card.center{cursor:grab}
   .card canvas{width:100%;flex:1;display:block;pointer-events:none}
   .card.center canvas{pointer-events:auto;cursor:grab;touch-action:none}
@@ -43,11 +44,14 @@
   .specs{position:absolute;top:50%;left:calc(50% + 285px);width:min(340px,calc(50vw - 300px));z-index:5;pointer-events:none;
     transform-origin:0 50%;transform:translateY(-52%) translateX(-190px) scale(.03,.42);opacity:0;
     transition:transform .75s cubic-bezier(.2,1.25,.35,1),opacity .3s ease;
-    background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px -18px rgba(20,22,26,.28),0 2px 6px rgba(20,22,26,.05);overflow:hidden}
+    background:radial-gradient(120% 70% at 0% 0%,rgba(46,160,67,.30),rgba(46,160,67,0) 60%),radial-gradient(90% 60% at 100% 100%,rgba(90,160,255,.22),rgba(90,160,255,0) 65%),linear-gradient(160deg,rgba(255,255,255,.72),rgba(255,255,255,.38));
+    -webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);
+    border:1px solid rgba(255,255,255,.75);border-radius:26px;
+    box-shadow:0 24px 50px -22px rgba(30,50,80,.38),inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(255,255,255,.35);overflow:hidden}
   .specs.show{transform:translateY(-52%) translateX(0) scale(1,1);opacity:1}
-  .specs h3{margin:0;padding:14px 20px;font-size:13.5px;font-weight:700;background:#f1f2f4;border-bottom:1px solid var(--line);letter-spacing:.2px}
-  .specs ul{list-style:none;margin:0;padding:4px 20px 8px}
-  .specs li{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #f0f0f2;font-size:13px;
+  .specs h3{margin:0;padding:22px 24px 6px;font-size:21px;font-weight:700;letter-spacing:-.2px}
+  .specs ul{list-style:none;margin:0;padding:6px 24px 14px}
+  .specs li{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid rgba(60,70,90,.09);font-size:13px;
     opacity:0;transform:translateX(-10px);transition:opacity .4s ease,transform .4s ease}
   .specs li:last-child{border-bottom:0}
   .specs.show li{opacity:1;transform:none}
@@ -257,22 +261,47 @@ function resizeViewer(entry){
 cards.forEach(setupMiniViewer);
 window.addEventListener('resize', () => cards.forEach(resizeViewer));
 
+/* ---------- carousel orbit: kursi lama berputar ke belakang lalu berhenti di sisi kiri (blur) ---------- */
+const PHI_FRONT = 0, PHI_LEFT = 270;
+function poseCard(entry){
+  const gap = Math.min(stage.clientWidth * 0.36, 340);
+  const r = entry.phi * Math.PI / 180;
+  const d = Math.cos(r), x = Math.sin(r) * gap;
+  const scale = d >= 0 ? 0.68 + 0.32 * d : 0.68 + 0.14 * d;
+  const y = d < 0 ? d * 18 : 0;
+  const blur = d >= 0 ? 2.5 * (1 - d) : 2.5 + 2.5 * -d;
+  const op = d >= 0 ? 0.55 + 0.45 * d : 0.55 + 0.15 * d;
+  const el = entry.el;
+  el.style.transform = `translate(${x}px,${y}px) scale(${scale})`;
+  el.style.zIndex = Math.round(10 + d * 6);
+  el.style.opacity = op;
+  el.style.filter = blur < 0.05 ? 'none' : `blur(${blur}px)`;
+}
 function layout(){
-  const n = cards.length;
   cards.forEach((entry, i) => {
-    let diff = i - centerIndex;
-    if (diff > n / 2) diff -= n;
-    if (diff < -n / 2) diff += n;
-    const gap = Math.min(stage.clientWidth * 0.36, 340);
-    const scale = diff === 0 ? 1 : 0.68;
-    const z = 10 - Math.abs(diff);
-    entry.el.style.transform = `translateX(${diff * gap}px) scale(${scale})`;
-    entry.el.style.zIndex = z;
-    entry.el.style.opacity = diff === 0 ? 1 : 0.55;
-    entry.el.style.filter = diff === 0 ? 'none' : 'blur(2.5px)';
-    entry.el.classList.toggle('center', diff === 0);
+    entry.phi = i === centerIndex ? PHI_FRONT : PHI_LEFT;
+    entry.el.classList.toggle('center', i === centerIndex);
+    poseCard(entry);
   });
   requestAnimationFrame(() => cards.forEach(resizeViewer));
+}
+let orbitRaf = null;
+function orbitTo(){
+  const from = cards.map(e => e.phi), delta = cards.map((e, i) => {
+    const goal = i === centerIndex ? PHI_FRONT : PHI_LEFT;
+    return (((goal - e.phi) % 360) + 360) % 360;
+  });
+  cards.forEach((e, i) => e.el.classList.toggle('center', i === centerIndex));
+  cancelAnimationFrame(orbitRaf);
+  stage.classList.add('orbiting');
+  const t0 = performance.now(), DUR = 950;
+  const ease = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+  (function frame(now){
+    const t = Math.min(1, (now - t0) / DUR), k = ease(t);
+    cards.forEach((e, i) => { e.phi = from[i] + delta[i] * k; poseCard(e); if (e.ready && e.group) e.renderer.render(e.scene, e.camera); });
+    if (t < 1) orbitRaf = requestAnimationFrame(frame);
+    else { cards.forEach(e => { e.phi %= 360; poseCard(e); }); stage.classList.remove('orbiting'); }
+  })(t0);
 }
 
 
@@ -285,6 +314,14 @@ const ICONS = {
   finish:'<svg viewBox="0 0 24 24"><path d="M12 3l2.2 5.3L20 10l-5.8 1.7L12 17l-2.2-5.3L4 10l5.8-1.7z"/><path d="M19 16v4M17 18h4"/></svg>',
   size:'<svg viewBox="0 0 24 24"><path d="m14 4 6 6L10 20l-6-6z"/><path d="m8 10 2 2M11 7l2 2M5 13l2 2"/></svg>'
 };
+MODELS.find(m => m.id === 'kursi-gaming-pro').specs = [
+  { icon:'seat',    k:'Konfigurasi',   v:'1 Seat' },
+  { icon:'leather', k:'Material Cover', v:'Synthetic Leather' },
+  { icon:'frame',   k:'Rangka',        v:'Metal Frame' },
+  { icon:'stitch',  k:'Jahitan',       v:'Premium Stitching' },
+  { icon:'finish',  k:'Finishing',     v:'Emboss / Quilted' },
+  { icon:'size',    k:'Dimensi',       v:'60 × 85 cm' }
+];
 MODELS.find(m => m.id === 'kursi-twinseat').specs = [
   { icon:'seat',    k:'Konfigurasi',   v:'2 Seat' },
   { icon:'leather', k:'Material Cover', v:'Synthetic Leather' },
@@ -312,8 +349,8 @@ function updateSpecs(delay){
 
 function setCenter(i){
   centerIndex = ((i % cards.length) + cards.length) % cards.length;
-  layout();
-  updateSpecs(520);
+  orbitTo();
+  updateSpecs(1000);
 }
 
 /* ---------- pilih model: klik kartu di samping, atau geser (drag) dengan kursor ---------- */
