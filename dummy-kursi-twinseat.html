@@ -76,6 +76,16 @@
   .sw:hover{transform:scale(1.08)}
   .sw.sel{outline:2px solid var(--brand);outline-offset:2px}
   .sw.orig{background:repeating-linear-gradient(135deg,#3a3f46 0 4px,#23272d 4px 8px)!important;font-size:9px;font-weight:700;color:#cfd3d6}
+  .logo-circle{width:34px;height:34px;border-radius:50%;border:1.5px dashed rgba(255,255,255,.45);flex:0 0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(255,255,255,.06) center/contain no-repeat;color:#fff}
+  .logo-circle.has{border-style:solid;border-color:rgba(255,255,255,.3)}
+  .logo-up{display:flex;align-items:center;gap:14px}
+  .logo-up .big{width:72px;height:72px;border-radius:50%;border:2px dashed rgba(255,255,255,.5);background:rgba(255,255,255,.06) center/contain no-repeat;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:30px;line-height:1;transition:.15s;padding:0;flex:0 0 auto}
+  .logo-up .big:hover{background-color:rgba(255,255,255,.14)}
+  .logo-up .big.has{border-style:solid;border-color:rgba(255,255,255,.3);font-size:0}
+  .logo-up .info{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  .logo-del{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:999px;padding:6px 14px;font:inherit;font-size:12px;cursor:pointer}
+  .logo-del:hover{background:rgba(220,60,60,.35)}
+  .logo-note{color:#fff;font-size:12px;margin:0}
   .custom{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--muted)}
   .custom input[type=color]{width:34px;height:28px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px;cursor:pointer}
   .custom input[type=text]{width:90px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:5px 8px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
@@ -143,6 +153,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { DecalGeometry } from "three/addons/geometries/DecalGeometry.js";
 
 const canvas = document.getElementById('view');
 const overlay = document.getElementById('overlay');
@@ -397,6 +408,7 @@ function renderParts(){
     partsEl.appendChild(el);
   });
   renderReco();
+  renderLogo();
 }
 function applyPreset(pr){
   Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (tintBaseTexture) { m.map = tintBaseTexture; m.needsUpdate = true; } m.color.set(h); }); });
@@ -420,6 +432,77 @@ function renderReco(){
     b.onclick = () => applyPreset(pr);
     list.appendChild(b);
   });
+  partsEl.appendChild(el);
+}
+
+/* ===== Logo di headrest (upload PNG) ===== */
+const LOGO_SPOTS = [ {x:-0.41}, {x:0.41} ];   // pusat 2 headrest (koordinat lokal model, meter)
+const LOGO_Z = 0.75, LOGO_BOX_W = 0.26, LOGO_BOX_H = 0.10;
+const logoState = { url:null, name:'', aspect:1 };
+const logoMeshes = [];
+let logoTex = null;
+function clearLogoMeshes(){
+  logoMeshes.splice(0).forEach(m => { m.parent && m.parent.remove(m); m.geometry.dispose(); });
+}
+function placeLogos(){
+  clearLogoMeshes();
+  if (!model || !logoTex) return;
+  model.updateMatrixWorld(true);
+  const meshes = []; model.traverse(n => { if (n.isMesh) meshes.push(n); });
+  const w = Math.min(LOGO_BOX_W, LOGO_BOX_H * logoState.aspect), h = w / logoState.aspect;
+  const mat = new THREE.MeshStandardMaterial({ map: logoTex, transparent:true, roughness:.55, metalness:0,
+    depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4 });
+  const ray = new THREE.Raycaster();
+  LOGO_SPOTS.forEach(sp => {
+    const o = model.localToWorld(new THREE.Vector3(sp.x, LOGO_Z, 3));
+    ray.set(o, new THREE.Vector3(0,0,-1));
+    const hit = ray.intersectObjects(meshes, false)[0];
+    if (!hit) return;
+    const nrm = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+    const dummy = new THREE.Object3D(); dummy.position.copy(hit.point); dummy.lookAt(hit.point.clone().add(nrm));
+    const g = new DecalGeometry(hit.object, hit.point, dummy.rotation, new THREE.Vector3(w, h, 0.12));
+    const m = new THREE.Mesh(g, mat); m.renderOrder = 2;
+    scene.add(m); logoMeshes.push(m);
+  });
+}
+function setLogo(file){
+  if (!file) return;
+  if (file.type !== 'image/png' && !/\.png$/i.test(file.name)) { toast('Logo harus berformat PNG'); return; }
+  const rd = new FileReader();
+  rd.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      if (logoTex) logoTex.dispose();
+      logoTex = new THREE.Texture(img); logoTex.colorSpace = THREE.SRGBColorSpace; logoTex.anisotropy = 8; logoTex.needsUpdate = true;
+      logoState.url = rd.result; logoState.name = file.name; logoState.aspect = img.naturalWidth / img.naturalHeight || 1;
+      placeLogos(); update(); toast('Logo dipasang');
+    };
+    img.onerror = () => toast('File PNG tidak bisa dibaca');
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(file);
+}
+function removeLogo(){
+  logoState.url = null; logoState.name = ''; clearLogoMeshes();
+  if (logoTex) { logoTex.dispose(); logoTex = null; }
+  update(); toast('Logo dihapus');
+}
+function renderLogo(){
+  const open = state.open === 'logo', has = !!logoState.url;
+  const el = document.createElement('div'); el.className = 'part'+(open?' open':'');
+  const bg = has ? `style="background-image:url('${logoState.url}')"` : '';
+  el.innerHTML = `<button class="part-row"><span class="logo-circle ${has?'has':''}" ${bg}>${has?'':'<svg width="14" height="14" viewBox="0 0 14 14"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'}</span>
+    <span class="t"><b>Logo Headrest</b><small>${has?logoState.name:'Belum ada logo'}</small></span>
+    <svg class="chev" width="16" height="16" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
+    <div class="part-body"><p class="desc">Logo tampil di bagian atas sandaran kiri & kanan.</p>
+      <div class="logo-up"><button class="big ${has?'has':''}" ${bg} title="Upload logo">${has?'':'+'}</button>
+        <div class="info"><p class="logo-note">Format file: <b>PNG</b><br>(disarankan latar transparan)</p>${has?'<button class="logo-del">Hapus logo</button>':''}</div></div>
+      <input type="file" accept="image/png" hidden></div>`;
+  const inp = el.querySelector('input[type=file]');
+  el.querySelector('.part-row').onclick = () => { state.open = open ? null : 'logo'; renderParts(); };
+  el.querySelector('.big').onclick = () => inp.click();
+  inp.onchange = e => { setLogo(e.target.files[0]); e.target.value = ''; };
+  const del = el.querySelector('.logo-del'); if (del) del.onclick = removeLogo;
   partsEl.appendChild(el);
 }
 function update(){ renderParts(); }
