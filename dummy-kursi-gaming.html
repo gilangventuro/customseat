@@ -17,18 +17,23 @@
   button,input{font:inherit;color:inherit}
   .notice{background:#2a2410;border-bottom:1px solid #4a3f14;color:#e8c766;font-size:12.5px;padding:8px 20px;text-align:center}
   .notice a{color:#e8c766}
-  .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100vh;background:radial-gradient(520px 420px at 100% 12%,rgba(63,191,74,.22),transparent 70%),radial-gradient(480px 380px at 92% 88%,rgba(120,140,170,.22),transparent 70%),linear-gradient(180deg,#e9ebee 0%,#eef0f2 45%,#f8f9fa 100%)}
-  .stage{position:relative;display:flex;flex-direction:column;background:linear-gradient(180deg,#e9ebee 0%,#eef0f2 45%,#f8f9fa 100%);color:#14161a;overflow:hidden;min-width:0}
-  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 24px;flex-wrap:wrap}
+  .app{display:grid;grid-template-columns:minmax(0,1fr) 400px;height:100vh;padding:14px;gap:14px;box-sizing:border-box;background:radial-gradient(520px 420px at 100% 12%,rgba(63,191,74,.22),transparent 70%),radial-gradient(480px 380px at 92% 88%,rgba(120,140,170,.22),transparent 70%),linear-gradient(180deg,#e9ebee 0%,#eef0f2 45%,#f8f9fa 100%)}
+  .stage{position:relative;display:flex;flex-direction:column;background:transparent;color:#14161a;overflow:hidden;min-width:0}
+  .topbar{pointer-events:none;position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .topbar{padding:14px 18px}
+  .topbar > *{pointer-events:auto}
   .brand{display:flex;align-items:flex-end;gap:10px;line-height:1}
   .brand img{height:28px;width:auto;display:block}
   .brand span{font-size:11px;letter-spacing:2px;color:#6b6f76;text-transform:uppercase;line-height:1;display:block;margin-bottom:2px}
   .top-actions{display:flex;gap:8px;flex-wrap:wrap}
-  .chip-btn{background:#2c9d36;border:1px solid #2c9d36;color:#fff;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;user-select:none;-webkit-user-select:none}
+  .chip-btn{display:inline-flex;align-items:center;height:38px;min-width:38px;padding:0 10px;background:#2c9d36;border:1px solid #2c9d36;color:#fff;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s;user-select:none;-webkit-user-select:none;overflow:hidden;white-space:nowrap}
+  .chip-btn svg{width:18px;height:18px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .chip-btn .lbl{max-width:0;opacity:0;margin-left:0;transition:max-width .3s cubic-bezier(.3,.8,.3,1),opacity .2s ease,margin-left .3s ease}
+  .chip-btn:hover .lbl,.chip-btn:focus-visible .lbl{max-width:130px;opacity:1;margin-left:8px;padding-right:4px}
   .chip-btn:hover{background:#237a2b;border-color:#237a2b}
   .chip-btn.active{background:#1c5f22;border-color:#1c5f22;color:#fff}
   .chip-btn.active:hover{background:#237a2b;border-color:#237a2b}
-  .presets{display:flex;gap:10px;padding:16px 24px;overflow-x:auto;scrollbar-width:thin;position:relative;border-top:1px solid rgba(255,255,255,.95);background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,.3));backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);box-shadow:0 -10px 28px rgba(20,22,26,.08),inset 0 1px 0 rgba(255,255,255,1);flex:0 0 auto;z-index:2}
+  .presets{display:flex;gap:10px;padding:12px 16px;margin:0 0 0;border-radius:22px;border:1px solid rgba(255,255,255,.7);overflow-x:auto;scrollbar-width:thin;position:relative;background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,.3));backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);box-shadow:0 -10px 28px rgba(20,22,26,.08),inset 0 1px 0 rgba(255,255,255,1);flex:0 0 auto;z-index:2}
   .preset{flex:0 0 auto;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.75);border-radius:14px;padding:8px 14px 8px 8px;cursor:pointer;transition:.15s;font-size:13px;font-weight:600;color:#14161a;box-shadow:0 2px 10px rgba(20,22,26,.06)}
   .preset:hover{background:rgba(255,255,255,.85)}
   .preset.active{border-color:var(--brand);background:rgba(63,191,74,.18)}
@@ -36,7 +41,7 @@
   .preset .dots i{width:18px;height:18px;border-radius:50%;border:2px solid #1b1e23;margin-left:-6px}
   .preset .dots i:first-child{margin-left:0}
   .view{flex:1;min-height:0;position:relative}
-  #view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer}
+  #view{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;display:block;touch-action:none;cursor:pointer}
   .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#6b6f76;font-size:14px;pointer-events:none}
   .spinner{width:28px;height:28px;border-radius:50%;border:3px solid rgba(20,22,26,.12);border-top-color:var(--brand);animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -46,7 +51,7 @@
   .badge{position:absolute;left:16px;top:16px;display:none;align-items:center;gap:7px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:7px 14px;font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--text);pointer-events:none}
   .badge.show{display:flex}
   .badge .dot{width:6px;height:6px;border-radius:50%;background:var(--brand);flex:0 0 auto}
-  .panel{background:linear-gradient(155deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.03) 32%,rgba(255,255,255,0) 60%),rgba(8,10,13,.70);backdrop-filter:blur(30px) saturate(150%);-webkit-backdrop-filter:blur(30px) saturate(150%);border-left:1px solid rgba(255,255,255,.22);box-shadow:inset 1px 0 0 rgba(255,255,255,.10),inset 0 1px 0 rgba(255,255,255,.12),-14px 0 44px rgba(20,22,26,.14);display:flex;flex-direction:column;min-height:0}
+  .panel{background:linear-gradient(155deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.03) 32%,rgba(255,255,255,0) 60%),rgba(8,10,13,.70);backdrop-filter:blur(30px) saturate(150%);-webkit-backdrop-filter:blur(30px) saturate(150%);border:1px solid rgba(255,255,255,.22);border-radius:28px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 24px 50px -20px rgba(10,14,20,.45);display:flex;flex-direction:column;min-height:0}
   .panel-head{padding:20px 22px 12px}
   .panel-head h1{font-size:18px;margin:0 0 4px}
   .panel-head p{margin:0;color:#fff;font-size:13px}
@@ -81,9 +86,9 @@
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#222;border:1px solid var(--line);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:20}
   .toast.show{opacity:1;transform:translateX(-50%)}
   @media (max-width:900px){
-    .app{grid-template-columns:1fr;height:auto}
+    .app{grid-template-columns:1fr;height:auto;padding:10px;gap:10px}
     .view{min-height:60vh}
-    .panel{border-left:0;border-top:1px solid rgba(255,255,255,.22)}
+    #view{position:absolute;inset:0;width:100%;height:100%;z-index:auto}
     .topbar{padding:14px 16px}
   }
 </style>
@@ -94,11 +99,11 @@
     <div class="topbar">
       <div class="brand"><img src="assets/logo-alldila-seats.png" alt="Alldila Seats"><span>Preview Model</span></div>
       <div class="top-actions">
-        <button class="chip-btn" id="btnReset">Reset tampilan</button>
-        <button class="chip-btn" id="btnPan">Geser Bebas</button>
-        <button class="chip-btn" id="btnDetachBody">Lepas Bantalan</button>
-        <button class="chip-btn" id="btnDetachLegs">Lepas Kaki</button>
-        <button class="chip-btn" id="btnFull">Layar penuh</button>
+        <button class="chip-btn" id="btnReset" title="Reset tampilan" aria-label="Reset tampilan"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span class="lbl">Reset tampilan</span></button>
+        <button class="chip-btn" id="btnPan" title="Geser Bebas" aria-label="Geser Bebas"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="m8.5 6.5 3.5-3.5 3.5 3.5M8.5 17.5l3.5 3.5 3.5-3.5M6.5 8.5 3 12l3.5 3.5M17.5 8.5 21 12l-3.5 3.5"/></svg><span class="lbl">Geser Bebas</span></button>
+        <button class="chip-btn" id="btnDetachBody" title="Lepas Bantalan" aria-label="Lepas Bantalan"><svg viewBox="0 0 24 24"><path d="M4 8h16v5H4zM6 13v4M18 13v4"/><path d="M12 3v3M9.5 4.5 12 2l2.5 2.5"/></svg><span class="lbl">Lepas Bantalan</span></button>
+        <button class="chip-btn" id="btnDetachLegs" title="Lepas Kaki" aria-label="Lepas Kaki"><svg viewBox="0 0 24 24"><path d="M9 3v10l-3 8M15 3v10l3 8"/><path d="M12 15v6M9.5 19.5 12 22l2.5-2.5"/></svg><span class="lbl">Lepas Kaki</span></button>
+        <button class="chip-btn" id="btnFull" title="Layar penuh" aria-label="Layar penuh"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span class="lbl">Layar penuh</span></button>
       </div>
     </div>
     <div class="view">
@@ -145,14 +150,14 @@ const progress = document.getElementById('progress');
 const hint = document.getElementById('hint');
 const stage = document.querySelector('.view');
 
-const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 
 const scene = new THREE.Scene();
 const DARK_BG = new THREE.Color(0xeef0f2);
-scene.background = DARK_BG;
+scene.background = null; /* transparan: gradasi halaman terlihat */
 
 /* ---------- interior bus (stilasi) ---------- */
 const INTERIOR_BG = new THREE.Color(0x20242b);
@@ -230,7 +235,7 @@ function layoutBus(size, center, box){
 const badgeEl = document.getElementById('badge');
 function setStudio(on){
   state.studio = on;
-  scene.background = on ? INTERIOR_BG : DARK_BG;
+  scene.background = on ? INTERIOR_BG : null;
   busGroup.visible = on;
   badgeEl.classList.toggle('show', on);
 }
@@ -268,10 +273,16 @@ function setPanMode(on){
 }
 
 function resize(){
-  const w = stage.clientWidth, h = stage.clientHeight;
+  const full = !matchMedia('(max-width:900px)').matches;
+  const w = full ? innerWidth : stage.clientWidth, h = full ? innerHeight : stage.clientHeight;
   renderer.setSize(w, h, false);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   camera.aspect = w / h;
+  if (full) {
+    /* pusat gambar = tengah area .view (di luar panel, di bawah navbar, di atas preset) */
+    const r = stage.getBoundingClientRect();
+    camera.setViewOffset(w, h, w/2 - (r.left + r.width/2), h/2 - (r.top + r.height/2), w, h);
+  } else camera.clearViewOffset();
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
@@ -335,7 +346,7 @@ function toggleDetach(key, btn){
   if (!g.meshes.length) return;
   g.target = g.target ? 0 : 1;
   btn.classList.toggle('active', !!g.target);
-  btn.textContent = (g.target ? 'Pasang ' : 'Lepas ') + g.label;
+  btn.querySelector('.lbl').textContent = (g.target ? 'Pasang ' : 'Lepas ') + g.label;
 }
 function updateDetach(){
   Object.values(DETACH).forEach(g => {
@@ -448,6 +459,8 @@ function toast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); c
 
 document.getElementById('btnResetColors').onclick = resetAll;
 document.getElementById('btnPng').onclick = () => {
+  const prevBg = scene.background;
+  if (!prevBg) scene.background = DARK_BG;
   renderer.render(scene, camera);
   canvas.toBlob(blob => {
     const a = document.createElement('a');
@@ -456,6 +469,7 @@ document.getElementById('btnPng').onclick = () => {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }, 'image/png');
+  scene.background = prevBg; renderer.render(scene, camera);
   toast('Mengunduh PNG…');
 };
 
@@ -534,8 +548,8 @@ document.getElementById('btnReset').onclick = () => {
 document.getElementById('btnFull').onclick = () => {
   document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
 };
-document.getElementById('btnDetachBody').onclick = e => toggleDetach('bantalan', e.target);
-document.getElementById('btnDetachLegs').onclick = e => toggleDetach('kaki', e.target);
+document.getElementById('btnDetachBody').onclick = e => toggleDetach('bantalan', e.currentTarget);
+document.getElementById('btnDetachLegs').onclick = e => toggleDetach('kaki', e.currentTarget);
 document.getElementById('btnPan').onclick = e => { setPanMode(!panMode); e.currentTarget.classList.toggle('active', panMode); };
 
 (function loop(){
