@@ -19,7 +19,13 @@ pat=Tf==1; main=Tf==0
 mean_p=L[pat].mean(); out_p=np.clip(31+(L-mean_p),6,120)
 out[pat]=np.stack([out_p*1.03,out_p*0.99,out_p],-1)[pat]
 # kulit utama: netralkan sisa rona hijau/cokelat
-gm=np.stack([L*1.03,L*0.99,L],-1); out[main]=gm[main]
+from scipy.ndimage import binary_dilation, uniform_filter
+Lm=L.copy(); med=np.median(L[main])
+bad=binary_dilation(main&(((g-r)>5)|((b-r)>5)|(L>np.percentile(L[main],97))),iterations=4)&main   # sisa toska/terang dekat list aksen
+Lm[bad]=med; soft=gaussian_filter(bad.astype(np.float32),2.0); Lm=Lm*(1-0)+0   # ganti lalu haluskan tepi
+Lm=np.where(bad,gaussian_filter(np.where(bad,med,L),1.5),Lm)
+Lm=np.minimum(Lm,np.percentile(L[main],97))
+gm=np.stack([Lm*1.03,Lm*0.99,Lm],-1); out[main]=gm[main]
 # list aksen: toska merata (warna default pilihan user), detail relief tetap
 acc=Tf==2
 ACC=np.array([ACC_R,ACC_G,ACC_B],np.float32)

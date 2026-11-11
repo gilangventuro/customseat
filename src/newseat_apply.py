@@ -5,24 +5,24 @@ BLEND,LAB,BASE,NORM,OUT=a
 bpy.ops.wm.open_mainfile(filepath=BLEND)
 o=[x for x in bpy.data.objects if x.type=='MESH'][0]
 lab=np.load(LAB).astype(np.int32)
-# Tuas merah hanya ada di sisi kanan: salin cermin (x -> -x) ke kursi kiri bila ada file wajah merah
+# Tuas merah di celah kursi: duplikat persis (geser x +DX, tanpa cermin) ke kursi sebelahnya bila LEVER_NPY diberikan
 RED=os.environ.get('LEVER_NPY')
 if RED:
     import bmesh
-    sel=np.load(RED); me0=o.data
+    DX=float(os.environ.get('LEVER_DX','0.82')); sel=np.load(RED); me0=o.data
     bm=bmesh.new(); bm.from_mesh(me0); bm.faces.ensure_lookup_table()
     uvl=bm.loops.layers.uv.active
     vmap={}
     def mv(v):
         if v.index not in vmap:
-            vmap[v.index]=bm.verts.new((-v.co.x,v.co.y,v.co.z))
+            vmap[v.index]=bm.verts.new((v.co.x+DX,v.co.y,v.co.z))
         return vmap[v.index]
     src=[bm.faces[i] for i in sel]
     newf=[]
     for f in src:
         vs=[mv(v) for v in f.verts]
-        nf=bm.faces.new(vs[::-1])
-        for l_new,l_old in zip(nf.loops, [f.loops[i] for i in range(len(f.loops))][::-1]):
+        nf=bm.faces.new(vs)
+        for l_new,l_old in zip(nf.loops, list(f.loops)):
             l_new[uvl].uv=l_old[uvl].uv
         newf.append(nf)
     bm.to_mesh(me0); bm.free(); me0.update()
