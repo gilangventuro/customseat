@@ -436,6 +436,47 @@ function renderReco(){
 }
 
 /* ===== Logo di headrest (upload PNG) ===== */
+/* ===== Jaring kantung belakang sandaran (dekorasi tetap, ditempel sebagai decal) ===== */
+const NET_SPOTS = [ {x:-0.45}, {x:0.45} ];   // pusat kantung belakang tiap sandaran (koordinat lokal model)
+const NET_Y = -0.01, NET_W = 0.40, NET_H = 0.36;
+const netMeshes = [];
+let netTex = null;
+function makeNetTexture(){
+  const W = 512, H = Math.round(512 * NET_H / NET_W), c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(8,9,11,.55)'; g.fillRect(0, 0, W, H);            // bayangan isi kantung di balik jaring
+  g.strokeStyle = 'rgba(58,62,70,.95)'; g.lineWidth = 3.2; g.lineCap = 'round';
+  const step = 34;
+  g.save(); g.beginPath(); g.rect(0, 0, W, H); g.clip();
+  for (let k = -H; k < W + H; k += step) {                              // anyaman belah ketupat
+    g.beginPath(); g.moveTo(k, 0); g.lineTo(k + H, H); g.stroke();
+    g.beginPath(); g.moveTo(k, H); g.lineTo(k + H, 0); g.stroke();
+  }
+  g.restore();
+  g.fillStyle = 'rgba(22,24,28,1)'; g.fillRect(0, 0, W, 9); g.fillRect(0, H - 9, W, 9); g.fillRect(0, 0, 9, H); g.fillRect(W - 9, 0, 9, H); // bingkai karet
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+function placeNets(){
+  netMeshes.splice(0).forEach(m => { m.parent && m.parent.remove(m); m.geometry.dispose(); });
+  if (!model) return;
+  if (!netTex) netTex = makeNetTexture();
+  model.updateMatrixWorld(true);
+  const meshes = []; model.traverse(n => { if (n.isMesh) meshes.push(n); });
+  const mat = new THREE.MeshStandardMaterial({ map: netTex, transparent:true, roughness:.8, metalness:0,
+    depthWrite:false, polygonOffset:true, polygonOffsetFactor:-3 });
+  const ray = new THREE.Raycaster();
+  NET_SPOTS.forEach(sp => {
+    ray.set(model.localToWorld(new THREE.Vector3(sp.x, NET_Y, -3)), new THREE.Vector3(0,0,1));   // tembak dari belakang
+    const hit = ray.intersectObjects(meshes, false)[0];
+    if (!hit) return;
+    const nrm = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+    if (nrm.z > 0) nrm.negate();
+    const dummy = new THREE.Object3D(); dummy.position.copy(hit.point); dummy.lookAt(hit.point.clone().add(nrm));
+    const g = new DecalGeometry(hit.object, hit.point, dummy.rotation, new THREE.Vector3(NET_W, NET_H, 0.1));
+    const m = new THREE.Mesh(g, mat); m.renderOrder = 1;
+    scene.add(m); netMeshes.push(m);
+  });
+}
 const LOGO_SPOTS = [ {x:-0.41}, {x:0.41} ];   // pusat 2 headrest (koordinat lokal model, meter)
 const LOGO_Z = 0.75, LOGO_BOX_W = 0.26, LOGO_BOX_H = 0.10;
 const logoState = { url:null, name:'', aspect:1 };
@@ -620,6 +661,7 @@ loader.load('assets/twin-seat-meshy.glb',
     defaultTarget = controls.target.clone();
 
     layoutBus(size, center, box);
+    placeNets();
 
     PARTS3D.forEach(p => { matRefs[p.key] = []; origMap[p.key] = []; });
     model.traverse(n => {
