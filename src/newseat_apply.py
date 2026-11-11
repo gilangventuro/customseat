@@ -9,7 +9,7 @@ lab=np.load(LAB).astype(np.int32)
 RED=os.environ.get('LEVER_NPY')
 if RED:
     import bmesh
-    DX=float(os.environ.get('LEVER_DX','0.82')); sel=np.load(RED); me0=o.data
+    DX=float(os.environ.get('LEVER_DX','0.827')); sel=np.load(RED); me0=o.data
     bm=bmesh.new(); bm.from_mesh(me0); bm.faces.ensure_lookup_table()
     uvl=bm.loops.layers.uv.active
     vmap={}
@@ -27,7 +27,7 @@ if RED:
         newf.append(nf)
     bm.to_mesh(me0); bm.free(); me0.update()
     print('lever faces mirrored',len(sel))
-    lab=np.concatenate([lab,np.full(len(sel),3,np.int32)])
+    lab=np.concatenate([lab,lab[sel]])
 me=o.data; me.materials.clear()
 base=bpy.data.images.load(BASE); norm=bpy.data.images.load(NORM); norm.colorspace_settings.name='Non-Color'
 def mk(name,rough):
