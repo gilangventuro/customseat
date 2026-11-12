@@ -14,7 +14,7 @@ Tf=T.copy()
 chroma_pat=((r-b)>=6)&(r>g)
 Tf=np.where(T==255,np.where(chroma_pat,1,0),T).astype(np.uint8)
 out=A.copy()
-pat=Tf==1; main=Tf==0
+pat=Tf==1; main=(Tf==0)|(Tf==4)   # kelas 4 (jahitan/Tali) warna dasarnya seperti kulit utama; bedanya hanya di tint
 # panel: seragam hitam, detail jahitan dipertahankan (hp) -> tidak ada sisa hijau/cokelat
 mean_p=L[pat].mean(); out_p=np.clip(31+(L-mean_p),6,120)
 out[pat]=np.stack([out_p*1.03,out_p*0.99,out_p],-1)[pat]
@@ -50,10 +50,10 @@ Image.fromarray(np.clip(out,0,255).astype(np.uint8)).save('_tmp_base4k.jpg',qual
 # tint-base: normalisasi per kelas berdasar peta label (2048)
 H=2048; Ts=np.asarray(Image.fromarray(Tf).resize((H,H),Image.NEAREST))
 Ls=np.asarray(Image.fromarray(L.astype(np.float32)).resize((H,H),Image.BOX)).astype(np.float64)
-W=np.stack([np.asarray(Image.fromarray(((Ts==c)*255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2))).astype(float)/255 for c in range(4)],0)
+W=np.stack([np.asarray(Image.fromarray(((Ts==c)*255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2))).astype(float)/255 for c in range(5)],0)
 W/=W.sum(0,keepdims=True)+1e-6
-AMP={0:0.045,1:0.06,2:0.09,3:0.09}; tint=np.zeros((H,H))
-for c in range(4):
+AMP={0:0.045,1:0.06,2:0.09,3:0.09,4:0.06}; tint=np.zeros((H,H))
+for c in range(5):
     sel=Ts==c
     if sel.sum()<10: continue
     m=sel.astype(np.float64); Lm=np.where(sel,Ls,0.0)

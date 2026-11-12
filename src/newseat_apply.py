@@ -42,7 +42,7 @@ def mk(name,rough):
     nt.links.new(tn.outputs['Color'],nm.inputs['Color']); nt.links.new(nm.outputs['Normal'],bs.inputs['Normal'])
     nt.links.new(bs.outputs['BSDF'],out.inputs['Surface'])
     return m
-for name,r in [('leather_main',0.55),('leather_pattern',0.55),('leather_accent',0.55),('leather_rest',0.6)]:
+for name,r in [('leather_main',0.55),('leather_pattern',0.55),('leather_accent',0.55),('leather_rest',0.6),('leather_stitch',0.55)]:
     me.materials.append(mk(name,r))
 me.polygons.foreach_set('material_index',lab); me.update()
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,

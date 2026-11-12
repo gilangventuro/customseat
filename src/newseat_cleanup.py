@@ -17,6 +17,7 @@ def cleanup(lab,pv,min_size=200,verbose=True):
         G=coo_matrix((np.ones(m.sum()),(a[m],b[m])),shape=(n,n))
         nc,cl=connected_components(G,directed=False)
         sz=np.bincount(cl); small=np.where(sz<min_size)[0]
+        small=small[np.bincount(cl,weights=(lab==4),minlength=nc)[small]==0]   # pulau Tali dibiarkan
         ch=0
         if len(small):
             isS=np.zeros(nc,bool); isS[small]=True
@@ -29,16 +30,18 @@ def cleanup(lab,pv,min_size=200,verbose=True):
             for s,t in ((ea,eb),(eb,ea)):
                 sel=isS[cl[s]]
                 for c_,l_ in zip(cl[s[sel]],lab[t[sel]]):
-                    votes.setdefault(c_,np.zeros(4,int))[l_]+=1
+                    votes.setdefault(c_,np.zeros(5,int))[l_]+=1
             new=np.zeros(nc,np.int8)-1
-            for c_,v in votes.items(): new[c_]=v.argmax()
+            for c_,v in votes.items():
+                if v[:4].sum()>0: new[c_]=v[:4].argmax()   # suara Tali diabaikan
             fix=isS[cl]&(new[cl]>=0)
             ch=(lab[fix]!=new[cl][fix]).sum(); lab[fix]=new[cl][fix]
         # 2) gigi 1-face: >=2 dari 3 tetangga sama & beda dari diri
-        cnt=np.zeros((n,4),int)
+        cnt=np.zeros((n,5),int)
         for s,t in ((a,b),(b,a)): np.add.at(cnt,(s,lab[t]),1)
-        best=cnt.argmax(1); bc=cnt.max(1)
-        tooth=(bc>=2)&(best!=lab)&(cnt[np.arange(n),lab]<=1)
+        cnt4=cnt[:,4].copy(); cnt[:,4]=-1   # Tali tidak ikut voting
+        best=cnt.argmax(1); bc=cnt.max(1); cnt[:,4]=cnt4
+        tooth=(bc>=2)&(best!=lab)&(cnt[np.arange(n),lab]<=1)&(lab!=4)
         lab[tooth]=best[tooth]
         if verbose: print('iter',it,'pulau diubah',ch,'gigi',tooth.sum())
     return lab
