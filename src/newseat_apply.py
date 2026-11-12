@@ -42,9 +42,19 @@ def mk(name,rough):
     nt.links.new(tn.outputs['Color'],nm.inputs['Color']); nt.links.new(nm.outputs['Normal'],bs.inputs['Normal'])
     nt.links.new(bs.outputs['BSDF'],out.inputs['Surface'])
     return m
-for name,r in [('leather_main',0.55),('leather_pattern',0.55),('leather_accent',0.55),('leather_rest',0.6),('leather_stitch',0.55)]:
+for name,r in [('leather_main',0.55),('leather_pattern',0.55),('leather_accent',0.55),('leather_rest',0.6)]:
     me.materials.append(mk(name,r))
+lab=np.where(lab==4,0,lab)   # jahitan = geometri benang terpisah (THREAD_NPZ), bukan label material
 me.polygons.foreach_set('material_index',lab); me.update()
+TH=os.environ.get('THREAD_NPZ')
+if TH:
+    z=np.load(TH); tm=bpy.data.meshes.new('JahitanMesh')
+    tm.from_pydata(z['V'].tolist(),[],z['F'].tolist()); tm.update()
+    to=bpy.data.objects.new('Jahitan',tm); bpy.context.scene.collection.objects.link(to)
+    sm=bpy.data.materials.new('leather_stitch'); sm.use_nodes=True
+    b=sm.node_tree.nodes['Principled BSDF']; b.inputs['Base Color'].default_value=(0.03,0.032,0.036,1); b.inputs['Roughness'].default_value=0.55
+    tm.materials.append(sm)
+    for pl in tm.polygons: pl.use_smooth=True
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)

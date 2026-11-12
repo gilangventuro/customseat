@@ -360,7 +360,7 @@ const PARTS3D = [
     mat:['leather_pattern'], pal:LEATHER},
   {key:'accent',  label:'List Aksen', desc:'Garis list di tepi kiri-kanan (warna = tint di atas tekstur asli)',
     mat:['leather_accent'], pal:LEATHER},
-  {key:'stitch',  label:'Warna Jahitan', desc:'Benang jahitan pada kulit (warna = tint di atas tekstur asli)',
+  {key:'stitch',  label:'Warna Jahitan', desc:'Benang jahitan dobel pada alur panel kiri-kanan',
     mat:['leather_stitch'], pal:LEATHER},
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
@@ -403,7 +403,7 @@ function updateFlash(){
 function applyColor(key, hex){
   state.c[key] = hex;
   (matRefs[key]||[]).forEach(m => {
-    if (tintBaseTexture) { m.map = tintBaseTexture; m.needsUpdate = true; }
+    if (tintBaseTexture && m.map) { m.map = tintBaseTexture; m.needsUpdate = true; }   /* benang jahitan = warna polos, tanpa tekstur */
     m.color.set(hex);
   });
   update();
