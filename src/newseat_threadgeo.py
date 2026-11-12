@@ -7,7 +7,7 @@ from scipy.sparse.csgraph import connected_components
 LAB,OUT=sys.argv[1],sys.argv[2]
 W=float(sys.argv[3]) if len(sys.argv)>3 else 0.003      # lebar benang (m)
 OFF=float(sys.argv[4]) if len(sys.argv)>4 else 0.0      # >0 = dobel, jarak tiap garis dari garis tengah
-H=0.0007                                                  # angkat dari permukaan
+H=0.0011                                                  # angkat dari permukaan
 d=np.load('_tmp_new.npz'); cen=d['cen']; nor=d['nor']
 lab=np.load(LAB); P=cen[lab==4].astype(np.float64); print('titik',len(P))
 fT=cKDTree(cen)
@@ -29,7 +29,7 @@ S=0.0024; g=np.floor(P/S).astype(np.int64); _,inv=np.unique(g,axis=0,return_inve
 inv=inv.ravel(); nn=inv.max()+1
 N=np.zeros((nn,3)); np.add.at(N,inv,P); N/=np.bincount(inv)[:,None]
 # sambungkan simpul bertetangga
-tr=cKDTree(N); pairs=np.array(sorted(tr.query_pairs(1.9*S)))
+tr=cKDTree(N); pairs=np.array(sorted(tr.query_pairs(2.4*S)))
 A=coo_matrix((np.ones(len(pairs)),(pairs[:,0],pairs[:,1])),shape=(nn,nn))
 nc,cl=connected_components(A,directed=False); sz=np.bincount(cl)
 keepn=sz[cl]>=8
@@ -51,8 +51,12 @@ for a,b in pairs:
     sd=np.cross(n,t); sd/=np.linalg.norm(sd)+1e-12
     for o in offs:
         base=sd*o
-        p0=N[a]-t*W/2+base; p1=N[b]+t*W/2+base
+        p0=N[a]-t*W+base; p1=N[b]+t*W+base
         q=[p0-sd*W/2,p0+sd*W/2,p1+sd*W/2,p1-sd*W/2]
         i=len(V); V+= [x+n*H for x in q]; NR+=[n]*4; F+=[(i,i+1,i+2),(i,i+2,i+3)]
-V=np.array(V,np.float32); F=np.array(F,np.int32); NR=np.array(NR,np.float32)
+V=np.array(V,np.float64); NR=np.array(NR,np.float64)
+# tiap titik pita ditempel ulang ke permukaan terdekat (agar tidak tenggelam di lekuk kulit), lalu diangkat H
+V0=V-NR*H; _,fi=fT.query(V0); nn_=nor[fi]
+V0=V0-((V0-cen[fi])*nn_).sum(1,keepdims=True)*nn_
+V=(V0+nn_*H).astype(np.float32); NR=nn_.astype(np.float32); F=np.array(F,np.int32)
 np.savez(OUT,V=V,F=F,N=NR); print('verts',len(V),'tris',len(F))
