@@ -2,7 +2,10 @@
 import bpy, numpy as np, sys
 SRC,LAB,THR,OUT=sys.argv[sys.argv.index('--')+1:]
 bpy.ops.wm.open_mainfile(filepath=SRC)
-o=[x for x in bpy.data.objects if x.type=='MESH'][0]; me=o.data
+o=[x for x in bpy.data.objects if x.type=='MESH'][0]
+bpy.context.view_layer.objects.active=o
+if o.mode!='OBJECT': bpy.ops.object.mode_set(mode='OBJECT')   # file disimpan saat Edit Mode: keluar dulu agar perubahan tersimpan
+me=o.data
 slot={}
 for i,m in enumerate(me.materials):
     n=(m.name if m else '').split('.')[0]; slot[{'1_KulitUtama_hitam':0,'2_MotifBerlian_panel':1,'3_ListAksen_hijau':2,'4_TidakBisaDiganti':3,'Tali':4}[n]]=i
