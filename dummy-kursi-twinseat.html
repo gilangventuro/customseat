@@ -573,7 +573,9 @@ ACC.forEach(a => { a.nodes = []; a.base = []; a.dir = new THREE.Vector3(); a.tar
 function setupAccessories(){
   ACC.forEach(a => {
     a.nodes = []; a.base = [];
-    model.traverse(n => { if (n.isMesh && n.name.includes(a.match)) { a.nodes.push(n); a.base.push(n.position.clone()); } });
+    model.traverse(n => { if (n.isMesh && n.name.includes(a.match)) { a.nodes.push(n); a.base.push(n.position.clone());
+      /* material tiap bagian di-clone agar bisa memudar sendiri tanpa memengaruhi bagian lain */
+      n.material = Array.isArray(n.material) ? n.material.map(m => m.clone()) : n.material.clone(); } });
     if (!a.nodes.length) return;
     const box = new THREE.Box3(); a.nodes.forEach(n => box.expandByObject(n));
     const c = box.getCenter(new THREE.Vector3());
@@ -592,9 +594,12 @@ function updateAccessories(){
       if (Math.abs(a.target - a.progress) < 0.002) a.progress = a.target;
     }
     const p = a.progress, e = p*p*(3-2*p);          /* ease in-out */
-    const vis = p < 0.995;
+    const vis = p < 0.995, fading = p > 0.001;
     a.nodes.forEach((n, i) => {
       n.visible = vis;
+      (Array.isArray(n.material) ? n.material : [n.material]).forEach(m => {
+        m.transparent = fading; m.depthWrite = !fading; m.opacity = 1 - e; m.needsUpdate = m._fade !== fading; m._fade = fading;
+      });
       n.position.copy(a.base[i]).addScaledVector(a.dir, e * 2.2);
     });
   });

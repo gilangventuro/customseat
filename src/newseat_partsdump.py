@@ -31,4 +31,21 @@ for k in range(1,6):
 pv=np.empty(nf*3,np.int32); me.polygons.foreach_get('vertices',pv); pv=pv.reshape(nf,3)
 cnt=np.stack([mem[k][pv].sum(1) for k in range(6)],1); cnt[:,0]=0
 part=np.where(cnt.max(1)>=2,cnt.argmax(1),0).astype(np.int8)
+# serpihan badan kecil yang terputus dari badan utama setelah pemisahan -> ikut bagian yang disentuhnya
+nb=part==0; par=np.arange(nv)
+def g(a):
+    while par[a]!=a: par[a]=par[par[a]]; a=par[a]
+    return a
+for a,b,c in pv[nb]:
+    for x,y in ((a,b),(b,c)):
+        rx,ry=g(x),g(y)
+        if rx!=ry: par[rx]=ry
+root=np.array([g(i) for i in range(nv)]); fr=root[pv[:,0]]
+ids,cn=np.unique(fr[nb],return_counts=True)
+for r,c in zip(ids,cn):
+    if c>=3000: continue
+    fm=nb&(fr==r); vs=np.unique(pv[fm])
+    touch=part[np.isin(pv,vs).any(1)&~nb]
+    if len(touch): k=np.bincount(touch).argmax(); part[fm]=k; print('serpihan',c,'faces -> bagian',k)
+    else: print('serpihan lepas',c,'faces tidak menyentuh bagian')
 np.save(OUT,part); print('part',np.bincount(part,minlength=6))
