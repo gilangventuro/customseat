@@ -46,7 +46,7 @@ for name,r in [('leather_main',0.55),('leather_pattern',0.55),('leather_accent',
     me.materials.append(mk(name,r))
 lab=np.where(lab==4,0,lab)   # jahitan = geometri benang terpisah (THREAD_NPZ), bukan label material
 me.polygons.foreach_set('material_index',lab); me.update()
-PN=os.environ.get('PART_NPY'); NAMES={1:'Handrest_Kanan',2:'Handrest_Kiri',3:'Footrest_Kanan',4:'Footrest_Kiri'}
+PN=os.environ.get('PART_NPY'); NAMES={1:'Handrest_Kanan',2:'Handrest_Kiri',3:'Footrest_Kanan',4:'Footrest_Kiri',5:'Handrest_Tengah'}
 part=np.zeros(len(me.polygons),np.int8)
 if PN:
     pp=np.load(PN); m_=min(len(pp),len(part)); part[:m_]=pp[:m_]

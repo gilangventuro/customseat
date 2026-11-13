@@ -567,6 +567,7 @@ const ACC = [
   {key:'handrest_kanan', label:'Handrest Kanan', match:'Handrest_Kanan', kind:'hand'},
   {key:'footrest_kiri',  label:'Footrest Kiri',  match:'Footrest_Kiri',  kind:'foot'},
   {key:'footrest_kanan', label:'Footrest Kanan', match:'Footrest_Kanan', kind:'foot'},
+  {key:'handrest_tengah', label:'Handrest Tengah', match:'Handrest_Tengah', kind:'hand'},
 ];
 ACC.forEach(a => { a.nodes = []; a.base = []; a.dir = new THREE.Vector3(); a.target = 0; a.progress = 0; });
 function setupAccessories(){
@@ -581,12 +582,8 @@ function setupAccessories(){
   });
 }
 function updateAccessories(){
-  ACC.forEach(a => {
-    if (!a.nodes.length) return;
-    a.progress += (a.target - a.progress) * 0.12;
-    if (Math.abs(a.target - a.progress) < 0.001) a.progress = a.target;
-    a.nodes.forEach((n, i) => n.position.copy(a.base[i]).addScaledVector(a.dir, a.progress));
-  });
+  /* lepas = bagian hilang, pasang = bagian muncul kembali */
+  ACC.forEach(a => a.nodes.forEach(n => { n.visible = !a.target; }));
 }
 function renderAcc(){
   const list = ACC.filter(a => a.nodes.length);
@@ -630,7 +627,7 @@ canvas.addEventListener('pointerup', e => {
   ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(ndc, camera);
-  const hits = raycaster.intersectObject(model, true);
+  const hits = raycaster.intersectObject(model, true).filter(h => h.object.visible);
   if (!hits.length) return;
   const hit = hits[0];
   const mats = Array.isArray(hit.object.material) ? hit.object.material : [hit.object.material];
