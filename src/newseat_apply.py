@@ -75,8 +75,18 @@ if PN:
         ob=bpy.data.objects.new(nm,nm_); bpy.context.scene.collection.objects.link(ob)
         print('bagian',nm,len(nm_.polygons))
     bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    seam=[e for e in bm.edges if len(e.link_faces)>=2 and any(part[f.index]==0 for f in e.link_faces) and any(part[f.index]!=0 for f in e.link_faces)]
     bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=0],context='FACES')
     bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
+    # tutup lubang bekas bagian yang dilepas (bagian dalam badan jadi tidak terlihat bolong)
+    seam=[e for e in seam if e.is_valid and e.is_boundary]
+    capf=bmesh.ops.holes_fill(bm,edges=seam,sides=4000)['faces']
+    seam2=[e for e in seam if e.is_valid and e.is_boundary]
+    try: capf+= [g for g in bmesh.ops.triangle_fill(bm,edges=seam2,use_beauty=True)['geom'] if isinstance(g,bmesh.types.BMFace)]
+    except Exception as ex: print('triangle_fill gagal',ex)
+    print('sisa tepi terbuka',len([e for e in seam2 if e.is_valid and e.is_boundary]))
+    for f in capf: f.material_index=3; f.smooth=True
+    print('tutup lubang: sisi',len(seam),'face penutup',len(capf))
     bm.to_mesh(me); bm.free()
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
