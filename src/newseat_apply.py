@@ -46,15 +46,38 @@ for name,r in [('leather_main',0.55),('leather_pattern',0.55),('leather_accent',
     me.materials.append(mk(name,r))
 lab=np.where(lab==4,0,lab)   # jahitan = geometri benang terpisah (THREAD_NPZ), bukan label material
 me.polygons.foreach_set('material_index',lab); me.update()
+PN=os.environ.get('PART_NPY'); NAMES={1:'Handrest_Kanan',2:'Handrest_Kiri',3:'Footrest_Kanan',4:'Footrest_Kiri'}
+part=np.zeros(len(me.polygons),np.int8)
+if PN:
+    pp=np.load(PN); m_=min(len(pp),len(part)); part[:m_]=pp[:m_]
 TH=os.environ.get('THREAD_NPZ')
+sm=None
 if TH:
-    z=np.load(TH); tm=bpy.data.meshes.new('JahitanMesh')
-    tm.from_pydata(z['V'].tolist(),[],z['F'].tolist()); tm.update()
-    to=bpy.data.objects.new('Jahitan',tm); bpy.context.scene.collection.objects.link(to)
     sm=bpy.data.materials.new('leather_stitch'); sm.use_nodes=True
     b=sm.node_tree.nodes['Principled BSDF']; b.inputs['Base Color'].default_value=(0.03,0.032,0.036,1); b.inputs['Roughness'].default_value=0.55
-    tm.materials.append(sm)
-    for pl in tm.polygons: pl.use_smooth=True
+    z=np.load(TH); V=z['V']; F=z['F']
+    qpart=np.load(os.environ['QPART_NPY']) if os.environ.get('QPART_NPY') else np.zeros(len(V)//4,np.int8)   # bagian per quad (dihitung di luar Blender: src/newseat_qpart.py)
+    fpart=qpart[np.arange(len(F))//2]     # 2 segitiga per quad
+    for k in sorted(set(fpart.tolist())):
+        sel=F[fpart==k]; used=np.unique(sel); remap=-np.ones(len(V),np.int64); remap[used]=np.arange(len(used))
+        tm=bpy.data.meshes.new('JahitanMesh%d'%k); tm.from_pydata(V[used].tolist(),[],remap[sel].tolist()); tm.update()
+        to=bpy.data.objects.new('Jahitan' if k==0 else 'Jahitan_'+NAMES[k],tm); bpy.context.scene.collection.objects.link(to)
+        tm.materials.append(sm)
+        for pl in tm.polygons: pl.use_smooth=True
+if PN:
+    import bmesh
+    for k,nm in NAMES.items():
+        bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+        bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=k],context='FACES')
+        bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
+        nm_=bpy.data.meshes.new(nm); bm.to_mesh(nm_); bm.free()
+        for m in me.materials: nm_.materials.append(m)
+        ob=bpy.data.objects.new(nm,nm_); bpy.context.scene.collection.objects.link(ob)
+        print('bagian',nm,len(nm_.polygons))
+    bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=0],context='FACES')
+    bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
+    bm.to_mesh(me); bm.free()
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)
