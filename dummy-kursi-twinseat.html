@@ -567,7 +567,7 @@ const ACC = [
   {key:'handrest_kanan', label:'Handrest Kanan', match:'Handrest_Kanan', kind:'hand'},
   {key:'footrest_kiri',  label:'Footrest Kiri',  match:'Footrest_Kiri',  kind:'foot'},
   {key:'footrest_kanan', label:'Footrest Kanan', match:'Footrest_Kanan', kind:'foot'},
-  {key:'handrest_tengah', label:'Handrest Tengah', match:'Handrest_Tengah', kind:'hand'},
+  {key:'handrest_tengah', label:'Handrest Tengah', match:'Handrest_Tengah', kind:'mid'},
 ];
 ACC.forEach(a => { a.nodes = []; a.base = []; a.dir = new THREE.Vector3(); a.target = 0; a.progress = 0; });
 function setupAccessories(){
@@ -578,12 +578,26 @@ function setupAccessories(){
     const box = new THREE.Box3(); a.nodes.forEach(n => box.expandByObject(n));
     const c = box.getCenter(new THREE.Vector3());
     /* handrest keluar ke samping (sisi sesuai posisinya), footrest maju ke depan */
+    if (a.kind==='mid') { a.dir.set(0, 0.3, 0.12); return; }
     a.dir.set(a.kind==='hand' ? Math.sign(c.x || 1)*0.32 : 0, a.kind==='hand' ? 0.03 : -0.02, a.kind==='foot' ? 0.48 : 0);
   });
 }
 function updateAccessories(){
-  /* lepas = bagian hilang, pasang = bagian muncul kembali */
-  ACC.forEach(a => a.nodes.forEach(n => { n.visible = !a.target; }));
+  /* lepas = meluncur menjauh lalu hilang, pasang = muncul dari jauh lalu meluncur masuk */
+  ACC.forEach(a => {
+    if (!a.nodes.length) return;
+    const d = a.target - a.progress;
+    if (d !== 0) {
+      a.progress += Math.sign(d) * Math.min(Math.abs(d), 0.018 + Math.abs(d) * 0.07);
+      if (Math.abs(a.target - a.progress) < 0.002) a.progress = a.target;
+    }
+    const p = a.progress, e = p*p*(3-2*p);          /* ease in-out */
+    const vis = p < 0.995;
+    a.nodes.forEach((n, i) => {
+      n.visible = vis;
+      n.position.copy(a.base[i]).addScaledVector(a.dir, e * 2.2);
+    });
+  });
 }
 function renderAcc(){
   const list = ACC.filter(a => a.nodes.length);
