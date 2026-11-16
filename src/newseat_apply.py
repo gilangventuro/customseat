@@ -381,8 +381,44 @@ if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk k
         dy=float(os.environ.get('REAR_DY','0.0')); dz=float(os.environ.get('REAR_DZ','0.0'))
         T=mathutils.Matrix.Translation((cr[0]-cs[0],cr[1]+dy,cr[2]+dz))@mathutils.Matrix.Rotation(dth,4,'X')@mathutils.Matrix.Translation((0,-cs[1],-cs[2]))
         for ob in kidsR: ob.data.transform(T); ob.data.update()
+        # cocokkan permukaan luar cangkang ke permukaan panel merah asli (medan tinggi y(x,z)): cangkang menjorok keluar seperti panel merah, detail tetap
+        if os.environ.get('REAR_RED','1')=='1':
+            CS=float(os.environ.get('REAR_CELL','0.03')); xa=RC[:,0].min()-0.15; xb=RC[:,0].max()+0.15; za=RC[:,2].min()-0.15; zb_=RC[:,2].max()+0.15
+            nx=int((xb-xa)/CS)+1; nz=int((zb_-za)/CS)+1
+            def grid(P,fn):
+                G=np.full((nx,nz),np.nan); ix=np.clip(((P[:,0]-xa)/CS).astype(int),0,nx-1); iz=np.clip(((P[:,2]-za)/CS).astype(int),0,nz-1)
+                key=ix*nz+iz; o_=np.argsort(key); ks=key[o_]; cuts=np.flatnonzero(np.diff(ks))+1
+                for gi in np.split(o_,cuts):
+                    if len(gi)>=2: G[ix[gi[0]],iz[gi[0]]]=fn(P[gi,1])
+                return G
+            def fill(G,it=60):
+                G=G.copy(); m=~np.isnan(G)
+                for _ in range(it):
+                    if m.all(): break
+                    Z=np.where(m,G,0.0); W=m.astype(float)
+                    Zp=np.pad(Z,1); Wp=np.pad(W,1)
+                    sm=sum(Zp[1+i:1+i+nx,1+j:1+j+nz] for i in (-1,0,1) for j in (-1,0,1)); wm=sum(Wp[1+i:1+i+nx,1+j:1+j+nz] for i in (-1,0,1) for j in (-1,0,1))
+                    new_=np.where(wm>0,sm/np.maximum(wm,1e-9),np.nan); G=np.where(m,G,new_); m=~np.isnan(G)
+                return G
+            def blur(G,it):
+                for _ in range(it):
+                    Gp=np.pad(G,1,mode='edge'); G=sum(Gp[1+i:1+i+nx,1+j:1+j+nz] for i in (-1,0,1) for j in (-1,0,1))/9.0
+                return G
+            allv=[]
+            for ob in kidsR:
+                a_=np.empty(len(ob.data.vertices)*3); ob.data.vertices.foreach_get('co',a_); allv.append(a_.reshape(-1,3))
+            AV=np.vstack(allv)
+            Gr=grid(RC,np.median); Gs=grid(AV,lambda y:np.percentile(y,97))   # y merah & permukaan belakang cangkang per sel
+            D=Gr-Gs; D=fill(D); D=blur(D,int(os.environ.get('REAR_BLUR','3')))
+            def samp(P):
+                fx=np.clip((P[:,0]-xa)/CS-0.0,0,nx-1.001); fz=np.clip((P[:,2]-za)/CS,0,nz-1.001); i0=fx.astype(int); j0=fz.astype(int); tx=fx-i0; tz=fz-j0
+                return D[i0,j0]*(1-tx)*(1-tz)+D[i0+1,j0]*tx*(1-tz)+D[i0,j0+1]*(1-tx)*tz+D[i0+1,j0+1]*tx*tz
+            off=float(os.environ.get('REAR_RED_OFF','0.0'))
+            for ob,a_ in zip(kidsR,allv):
+                a2=a_.copy(); a2[:,1]+=samp(a2)+off; ob.data.vertices.foreach_set('co',a2.ravel()); ob.data.update()
+            print('cocok merah: geser y',round(float(np.nanmin(D)),3),'..',round(float(np.nanmax(D)),3))
         # penyempurnaan: cari putaran (sumbu x) + geser y agar bagian depan cangkang menempel ke punggung badan sepanjang tinggi tanpa menembus
-        if os.environ.get('REAR_REFINE','1')=='1':
+        if os.environ.get('REAR_REFINE','0')=='1':
             _M2=np.array(o.matrix_world); _Pb=np.empty(len(me.vertices)*3); me.vertices.foreach_get('co',_Pb); _Pb=_Pb.reshape(-1,3); _Wb=_Pb@_M2[:3,:3].T+_M2[:3,3]
             _cx0,_cx1=X0+float(os.environ.get('REAR_CXM','0.12')),X1-float(os.environ.get('REAR_CXM','0.12'))   # lebar jok kiri
             _bb=_Wb[(_Wb[:,0]>_cx0)&(_Wb[:,0]<_cx1)&(_Wb[:,2]>-0.3)&(_Wb[:,2]<0.62)]
@@ -416,7 +452,7 @@ if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk k
                 Tr=mathutils.Matrix.Translation((0,piv[0]+dy_,piv[1]))@mathutils.Matrix.Rotation(th,4,'X')@mathutils.Matrix.Translation((0,-piv[0],-piv[1]))
                 for ob in kidsR: ob.data.transform(Tr); ob.data.update()
             # lengkungkan: geser y tiap titik cangkang menurut tinggi z agar sisi depannya menempel di profil punggung badan (badan melengkung, cangkang lurus)
-            if os.environ.get('REAR_WARP','1')=='1':
+            if os.environ.get('REAR_WARP','0')=='1':
                 allv=[]
                 for ob in kidsR:
                     a_=np.empty(len(ob.data.vertices)*3); ob.data.vertices.foreach_get('co',a_); allv.append(a_.reshape(-1,3))
