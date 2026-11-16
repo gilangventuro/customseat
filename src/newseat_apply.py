@@ -69,6 +69,56 @@ if os.environ.get('HR_SMOOTH','1')=='1':
         wl=w[li]; nn=old_n*(1-wl)+vn[li]*wl; nn/=np.maximum(np.linalg.norm(nn,axis=1,keepdims=True),1e-9)
         me.normals_split_custom_set(nn.tolist()); me.update()
     print('haluskan sandaran: verts',int((w[:,0]>0).sum()),'iter',IT)
+# Jaring kantong di panel kotak punggung sandaran (kedua jok): kisi belah ketupat + bingkai, mengikuti permukaan panel
+if os.environ.get('NET','1')=='1':
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    dg=bpy.context.evaluated_depsgraph_get(); tree=BVHTree.FromObject(o,dg); MWi=o.matrix_world.inverted(); MW=o.matrix_world
+    nm_=bpy.data.materials.new('jaring'); nm_.use_nodes=True; nb=nm_.node_tree.nodes['Principled BSDF']
+    nb.inputs['Base Color'].default_value=(0.07,0.075,0.09,1); nb.inputs['Roughness'].default_value=0.8
+    bm_=bpy.data.materials.new('jaring_dasar'); bm_.use_nodes=True; bb_=bm_.node_tree.nodes['Principled BSDF']; bb_.inputs['Base Color'].default_value=(0.01,0.011,0.015,1); bb_.inputs['Roughness'].default_value=0.9
+    CELL=0.02; OFF=0.004; HW=0.0022; HD=0.0035
+    def surf(x,z):
+        h=tree.ray_cast(MWi@Vector((x,2.0,z)),MWi.to_3x3()@Vector((0,-1,0)))
+        return None if h[0] is None else (MW@h[0]).y
+    def box(V,F,p0,p1,w,d):
+        t=(p1-p0); t.normalize(); n=Vector((0,1,0)); b=t.cross(n); b.normalize(); n2=b.cross(t); n2.normalize()
+        base=len(V)
+        for p in (p0,p1):
+            for sb,sn in ((-1,-1),(1,-1),(1,1),(-1,1)): V.append(tuple(p+b*(w/2*sb)+n2*(d/2*sn)))
+        for i in range(4):
+            j=(i+1)%4; F+= [(base+i,base+j,base+4+j),(base+i,base+4+j,base+4+i)]
+        F+= [(base,base+2,base+1),(base,base+3,base+2),(base+4,base+5,base+6),(base+4,base+6,base+7)]
+    for k,(xa,xb) in enumerate(((0.17,0.65),(-0.65,-0.17))):
+        za,zb=-0.285,0.015; nx=int(round((xb-xa)/CELL)); nz=int(round((zb-za)/CELL)); dx=(xb-xa)/nx; dz=(zb-za)/nz
+        P={}
+        for i in range(nx+1):
+            for j in range(nz+1):
+                x=xa+i*dx; z=za+j*dz; y=surf(x,z)
+                if y is not None: P[(i,j)]=Vector((x,y+OFF,z))
+        V=[];F=[]
+        for (i,j),p in P.items():
+            if (i+j)%2: continue
+            for di,dj in ((1,1),(1,-1)):
+                q=P.get((i+di,j+dj))
+                if q is not None and 0<=j+dj<=nz: box(V,F,p,q,HW*2,HD*2)
+        for j in (0,nz):    # bingkai atas/bawah
+            for i in range(nx):
+                if (i,j) in P and (i+1,j) in P: box(V,F,P[(i,j)],P[(i+1,j)],0.010,HD*2.4)
+        for i in (0,nx):    # bingkai kiri/kanan
+            for j in range(nz):
+                if (i,j) in P and (i,j+1) in P: box(V,F,P[(i,j)],P[(i,j+1)],0.010,HD*2.4)
+        nf=len(F); FM=[0]*nf
+        for i in range(nx):    # alas gelap di belakang kisi
+            for j in range(nz):
+                c=[P.get((i,j)),P.get((i+1,j)),P.get((i+1,j+1)),P.get((i,j+1))]
+                if None in c: continue
+                b0=len(V); V.extend(tuple(q-Vector((0,OFF*0.6,0))) for q in c); F+= [(b0,b0+1,b0+2),(b0,b0+2,b0+3)]; FM+=[1,1]
+        jm=bpy.data.meshes.new('JaringMesh%d'%k); jm.from_pydata(V,[],F); jm.update(); jm.materials.append(nm_); jm.materials.append(bm_)
+        jm.polygons.foreach_set('material_index',FM)
+        for pl in jm.polygons: pl.use_smooth=False
+        jo=bpy.data.objects.new('Jaring_Kanan' if k==0 else 'Jaring_Kiri',jm); bpy.context.scene.collection.objects.link(jo)
+        print('jaring',k,len(F),'tri')
 me.materials.clear()
 base=bpy.data.images.load(BASE); norm=bpy.data.images.load(NORM); norm.colorspace_settings.name='Non-Color'
 def mk(name,rough):
