@@ -56,8 +56,9 @@ if os.environ.get('HR_SMOOTH','1')=='1':
     for c in range(3): Nrm[:,c]=np.bincount(uid,weights=vn0[:,c],minlength=nu)/cnt
     for _ in range(20): Nrm=Nrm+0.5*lap(Nrm)
     Nrm/=np.maximum(np.linalg.norm(Nrm,axis=1,keepdims=True),1e-9)
-    for _ in range(int(os.environ.get('HR_IT2','0'))):
-        L=lap(U); U=U+0.8*wu*(L*Nrm).sum(1,keepdims=True)*Nrm
+    for _ in range(int(os.environ.get('HR_IT2','250'))):
+        L=lap(U); bk=np.clip((Nrm[:,1]-0.35)/0.3,0,1)[:,None]   # hanya permukaan belakang (normal +y): sudut sandaran tidak ikut menyusut
+        U=U+0.8*wu*bk*(L*Nrm).sum(1,keepdims=True)*Nrm
     P=P+(U[uid]-np.array([np.bincount(uid,weights=P[:,c],minlength=nu)/cnt for c in range(3)]).T[uid])*(w>0)
     me.vertices.foreach_set('co',P.ravel()); me.update()
     # normal bawaan (custom) masih memuat kerutan lama -> ganti dengan normal geometri baru di area yang dihaluskan
