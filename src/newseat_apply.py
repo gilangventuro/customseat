@@ -151,7 +151,7 @@ if TH:
     qpart=np.load(os.environ['QPART_NPY']) if os.environ.get('QPART_NPY') else np.zeros(len(V)//4,np.int8)   # bagian per quad (dihitung di luar Blender: src/newseat_qpart.py)
     fpart=qpart[np.arange(len(F))//2]     # 2 segitiga per quad
     for k in sorted(set(fpart.tolist())):
-        if HB and k==2: continue   # jahitan handrest kiri lama diganti handrest baru
+        if HB and k in (1,2): continue   # jahitan handrest kiri lama diganti handrest baru
         sel=F[fpart==k]; used=np.unique(sel); remap=-np.ones(len(V),np.int64); remap[used]=np.arange(len(used))
         tm=bpy.data.meshes.new('JahitanMesh%d'%k); tm.from_pydata(V[used].tolist(),[],remap[sel].tolist()); tm.update()
         to=bpy.data.objects.new('Jahitan' if k==0 else 'Jahitan_'+NAMES[k],tm); bpy.context.scene.collection.objects.link(to)
@@ -160,7 +160,7 @@ if TH:
 if PN:
     import bmesh
     for k,nm in NAMES.items():
-        if HB and k==2: continue
+        if HB and k in (1,2): continue
         bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
         bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=k],context='FACES')
         bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
@@ -182,64 +182,72 @@ if PN:
     for f in capf: f.material_index=3; f.smooth=True
     print('tutup lubang: sisi',len(seam),'face penutup',len(capf))
     bm.to_mesh(me); bm.free()
-if HB:   # handrest kiri baru dari rakitan di blend pengguna (nama Handrest_Kiri_NN supaya animasi lepas/pasang di web tetap jalan)
-    RATIO=float(os.environ.get('HAND_RATIO','0.12'))
-    with bpy.data.libraries.load(HB) as (d0,d1): d1.objects=[n for n in d0.objects if n=='Assem--KAKI BANGKU SUZUKI' or n.startswith(('(OPSI','AS ROTOR','BESI AR','HOUSING','KARET','KEPALA SAFETY','PART','PUSH BOTTOM','ROTOR'))]
-    for ob in d1.objects: bpy.context.scene.collection.objects.link(ob)
-    bpy.context.view_layer.update()
-    import bmesh
-    kids=[ob for ob in d1.objects if ob.type=='MESH']; tot=0
-    GELAP={'defaultplastic.001','defaultplastic.002','defaultplastic.004','defaultplastic.008','satinfinishaluminum','satinfinishaluminum.001','Material_5','Material_6'}   # abu-abu & silver -> hitam
-    for i,ob in enumerate(kids):
-        M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
-        bpy.context.view_layer.objects.active=ob; ob.select_set(True)
-        bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
-        n0=len(ob.data.polygons)
-        # rapikan: gabung bidang rata (CAD) dulu tanpa kehilangan bentuk, baru kurangi sisanya
-        bm=bmesh.new(); bm.from_mesh(ob.data)
-        bmesh.ops.dissolve_limit(bm,angle_limit=math.radians(float(os.environ.get('HAND_DISS','0.6'))),verts=bm.verts,edges=bm.edges,delimit={'MATERIAL'})
-        bmesh.ops.triangulate(bm,faces=bm.faces); bm.to_mesh(ob.data); bm.free()
-        ob.data.update(); n1=len(ob.data.polygons)
-        tgt=int(os.environ.get('HAND_TARGET','70000'))*n0/sum(len(k.data.polygons) for k in kids) if False else None
-        ob.name='Handrest_Kiri_%02d'%i; print('handrest baru',ob.name,n0,'->',n1)
-    allf=sum(len(k.data.polygons) for k in kids); RATIO=min(1.0,float(os.environ.get('HAND_TARGET','120000'))/allf); print('setelah dissolve',allf,'rasio',round(RATIO,3))
-    for ob in kids:
-        bpy.context.view_layer.objects.active=ob
-        if RATIO<1 and len(ob.data.polygons)>1500:
-            md=ob.modifiers.new('dec','DECIMATE'); md.ratio=RATIO; md.delimit={'NORMAL','MATERIAL'}; md.angle_limit=math.radians(25); bpy.ops.object.modifier_apply(modifier='dec')
-        me_=ob.data
-        for pl in me_.polygons: pl.use_smooth=True
-        try: me_.shade_smooth()
-        except Exception: pass
-        for sl,m in enumerate(me_.materials):
-            if m and m.name in GELAP:
-                nm=m.copy(); nm.name='hitam_'+m.name; nm.use_nodes=True; nt=nm.node_tree; nt.nodes.clear()
-                out=nt.nodes.new('ShaderNodeOutputMaterial'); bs=nt.nodes.new('ShaderNodeBsdfPrincipled'); bs.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs.inputs['Roughness'].default_value=0.5; bs.inputs['Metallic'].default_value=0.0
-                nt.links.new(bs.outputs['BSDF'],out.inputs['Surface']); me_.materials[sl]=nm
-        tot+=len(me_.polygons); print('hasil',ob.name,len(me_.polygons))
-    for ob in d1.objects:
-        if ob.type=='EMPTY': bpy.data.objects.remove(ob)
-    print('handrest baru total face',tot)
-    # isi padat: rumah handrest berongga di sisi dalam (nampak kopong dari depan) -> tutup dengan lempeng padat sampai badan kursi
-    if os.environ.get('HAND_ISI','1')=='1':
-        import mathutils
-        def span(o,ax): 
-            vs=[v.co[ax] for v in o.data.vertices]; return max(vs)-min(vs), max(vs)
-        cand=[o for o in kids if max(v.co.z for v in o.data.vertices)<-0.25]
-        hs=max(cand,key=lambda o:span(o,1)[0]) if cand else None
-        if hs:
-            mx=max(v.co.x for v in hs.data.vertices); XB=float(os.environ.get('ISI_XB','-0.66')); TH=float(os.environ.get('ISI_TH','0.05'))
-            pts=[v.co.copy() for v in hs.data.vertices if v.co.x>mx-TH][::3]
-            bm=bmesh.new()
-            for q in pts: bm.verts.new(q); bm.verts.new((XB,q.y,q.z))
-            bmesh.ops.convex_hull(bm,input=list(bm.verts))
-            for f in list(bm.faces): f.smooth=True
-            hm=bpy.data.meshes.new('IsiRumahHandrest'); bm.to_mesh(hm); bm.free()
-            ho=bpy.data.objects.new('Handrest_Kiri_Isi',hm); bpy.context.scene.collection.objects.link(ho)
-            for pl in hm.polygons: pl.use_smooth=True
-            mt=bpy.data.materials.new('isi_hitam'); mt.use_nodes=True; bs=mt.node_tree.nodes.get('Principled BSDF')
-            bs.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs.inputs['Roughness'].default_value=0.5
-            hm.materials.append(mt); print('isi rumah handrest',hs.name,len(hm.polygons),'x',round(mx,3),'->',XB)
+
+for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem2",1,1)]:
+    if HB:   # handrest baru dari rakitan di blend pengguna (nama Handrest_Kiri_NN supaya animasi lepas/pasang di web tetap jalan)
+        RATIO=float(os.environ.get('HAND_RATIO','0.12'))
+        if 'ALLOBJ' not in globals():
+            with bpy.data.libraries.load(HB) as (d0,d1_): d1_.objects=[n for n in d0.objects if n not in ('Kursi MESH','Mesh_0.001')]
+            ALLOBJ=[o for o in d1_.objects if o]
+            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2')}
+        class _S: pass
+        d1=_S(); d1.objects=SELS[ASM]
+        for ob in d1.objects: bpy.context.scene.collection.objects.link(ob)
+        bpy.context.view_layer.update()
+        import bmesh
+        kids=[ob for ob in d1.objects if ob.type=='MESH']; tot=0
+        GELAP={'defaultplastic.001','defaultplastic.002','defaultplastic.004','defaultplastic.008','satinfinishaluminum','satinfinishaluminum.001','Material_5','Material_6','defaultplastic.018','defaultplastic.019','defaultplastic.020','defaultplastic.021','defaultplastic.022','defaultplastic.023'}   # abu-abu & silver -> hitam
+        for i,ob in enumerate(kids):
+            M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
+            bpy.context.view_layer.objects.active=ob; ob.select_set(True)
+            bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+            n0=len(ob.data.polygons)
+            # rapikan: gabung bidang rata (CAD) dulu tanpa kehilangan bentuk, baru kurangi sisanya
+            bm=bmesh.new(); bm.from_mesh(ob.data)
+            bmesh.ops.dissolve_limit(bm,angle_limit=math.radians(float(os.environ.get('HAND_DISS','0.6'))),verts=bm.verts,edges=bm.edges,delimit={'MATERIAL'})
+            bmesh.ops.triangulate(bm,faces=bm.faces); bm.to_mesh(ob.data); bm.free()
+            ob.data.update(); n1=len(ob.data.polygons)
+            tgt=int(os.environ.get('HAND_TARGET','70000'))*n0/sum(len(k.data.polygons) for k in kids) if False else None
+            ob.name='Handrest_%s_%02d'%(SIDE,i); print('handrest baru',ob.name,n0,'->',n1)
+        allf=sum(len(k.data.polygons) for k in kids); RATIO=min(1.0,float(os.environ.get('HAND_TARGET','120000'))/allf); print('setelah dissolve',allf,'rasio',round(RATIO,3))
+        for ob in kids:
+            bpy.context.view_layer.objects.active=ob
+            if RATIO<1 and len(ob.data.polygons)>1500:
+                md=ob.modifiers.new('dec','DECIMATE'); md.ratio=RATIO; md.delimit={'NORMAL','MATERIAL'}; md.angle_limit=math.radians(25); bpy.ops.object.modifier_apply(modifier='dec')
+            me_=ob.data
+            for pl in me_.polygons: pl.use_smooth=True
+            try: me_.shade_smooth()
+            except Exception: pass
+            print('mat',ob.name,[m.name if m else None for m in me_.materials])
+            for sl,m in enumerate(me_.materials):
+                if m and m.name in GELAP:
+                    nm=m.copy(); nm.name='hitam_'+m.name; nm.use_nodes=True; nt=nm.node_tree; nt.nodes.clear()
+                    out=nt.nodes.new('ShaderNodeOutputMaterial'); bs=nt.nodes.new('ShaderNodeBsdfPrincipled'); bs.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs.inputs['Roughness'].default_value=0.5; bs.inputs['Metallic'].default_value=0.0
+                    nt.links.new(bs.outputs['BSDF'],out.inputs['Surface']); me_.materials[sl]=nm
+            tot+=len(me_.polygons); print('hasil',ob.name,len(me_.polygons))
+        for ob in d1.objects:
+            if ob.type=='EMPTY': bpy.data.objects.remove(ob)
+        print('handrest baru total face',tot)
+        # isi padat: rumah handrest berongga di sisi dalam (nampak kopong dari depan) -> tutup dengan lempeng padat sampai badan kursi
+        if os.environ.get('HAND_ISI','1')=='1':
+            import mathutils
+            def span(o,ax): 
+                vs=[v.co[ax] for v in o.data.vertices]; return max(vs)-min(vs), max(vs)
+            cand=[o for o in kids if max(v.co.z for v in o.data.vertices)<-0.25]
+            hs=max(cand,key=lambda o:span(o,1)[0]) if cand else None
+            if hs:
+                mx=(max if SGN<0 else min)(v.co.x for v in hs.data.vertices); XB=SGN*float(os.environ.get('ISI_XB','0.66')); TH=float(os.environ.get('ISI_TH','0.05'))
+                pts=[v.co.copy() for v in hs.data.vertices if (v.co.x-mx)*(-SGN)>-TH][::3]
+                bm=bmesh.new()
+                for q in pts: bm.verts.new(q); bm.verts.new((XB,q.y,q.z))
+                bmesh.ops.convex_hull(bm,input=list(bm.verts))
+                for f in list(bm.faces): f.smooth=True
+                hm=bpy.data.meshes.new('IsiRumahHandrest'); bm.to_mesh(hm); bm.free()
+                ho=bpy.data.objects.new('Handrest_%s_Isi'%SIDE,hm); bpy.context.scene.collection.objects.link(ho)
+                for pl in hm.polygons: pl.use_smooth=True
+                mt=bpy.data.materials.new('isi_hitam'); mt.use_nodes=True; bs=mt.node_tree.nodes.get('Principled BSDF')
+                bs.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs.inputs['Roughness'].default_value=0.5
+                hm.materials.append(mt); print('isi rumah handrest',SIDE,hs.name,len(hm.polygons),'x',round(mx,3),'->',XB)
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)
