@@ -194,13 +194,14 @@ for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem
         d1=_S(); d1.objects=SELS[ASM]
         for ob in d1.objects: bpy.context.scene.collection.objects.link(ob)
         bpy.context.view_layer.update()
-        import bmesh
+        import bmesh, mathutils
         kids=[ob for ob in d1.objects if ob.type=='MESH']; tot=0
         GELAP={'defaultplastic.001','defaultplastic.002','defaultplastic.004','defaultplastic.008','satinfinishaluminum','satinfinishaluminum.001','Material_5','Material_6','defaultplastic.018','defaultplastic.019','defaultplastic.020','defaultplastic.021','defaultplastic.022','defaultplastic.023'}   # abu-abu & silver -> hitam
         for i,ob in enumerate(kids):
             M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
             bpy.context.view_layer.objects.active=ob; ob.select_set(True)
             bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+            if SIDE=='Kiri': ob.data.transform(mathutils.Matrix.Translation((0,0,float(os.environ.get('HAND_DZ_KIRI','-0.03')))))   # setarakan tinggi dengan handrest kanan
             n0=len(ob.data.polygons)
             # rapikan: gabung bidang rata (CAD) dulu tanpa kehilangan bentuk, baru kurangi sisanya
             bm=bmesh.new(); bm.from_mesh(ob.data)
