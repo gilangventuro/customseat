@@ -75,9 +75,9 @@ if os.environ.get('NET','1')=='1':
     from mathutils.bvhtree import BVHTree
     dg=bpy.context.evaluated_depsgraph_get(); tree=BVHTree.FromObject(o,dg); MWi=o.matrix_world.inverted(); MW=o.matrix_world
     nm_=bpy.data.materials.new('jaring'); nm_.use_nodes=True; nb=nm_.node_tree.nodes['Principled BSDF']
-    nb.inputs['Base Color'].default_value=(0.07,0.075,0.09,1); nb.inputs['Roughness'].default_value=0.8
-    bm_=bpy.data.materials.new('jaring_dasar'); bm_.use_nodes=True; bb_=bm_.node_tree.nodes['Principled BSDF']; bb_.inputs['Base Color'].default_value=(0.01,0.011,0.015,1); bb_.inputs['Roughness'].default_value=0.9
-    CELL=0.02; OFF=0.004; HW=0.0022; HD=0.0035
+    nb.inputs['Base Color'].default_value=(0.008,0.008,0.009,1); nb.inputs['Roughness'].default_value=0.8
+    bm_=bpy.data.materials.new('jaring_dasar'); bm_.use_nodes=True; bb_=bm_.node_tree.nodes['Principled BSDF']; bb_.inputs['Base Color'].default_value=(0.0,0.0,0.0,1); bb_.inputs['Roughness'].default_value=0.9
+    CELL=0.02; OFF=0.003; HW=0.0022; HD=0.0035
     def surf(x,z):
         h=tree.ray_cast(MWi@Vector((x,2.0,z)),MWi.to_3x3()@Vector((0,-1,0)))
         return None if h[0] is None else (MW@h[0]).y
@@ -89,8 +89,8 @@ if os.environ.get('NET','1')=='1':
         for i in range(4):
             j=(i+1)%4; F+= [(base+i,base+j,base+4+j),(base+i,base+4+j,base+4+i)]
         F+= [(base,base+2,base+1),(base,base+3,base+2),(base+4,base+5,base+6),(base+4,base+6,base+7)]
-    for k,(xa,xb) in enumerate(((0.17,0.65),(-0.65,-0.17))):
-        za,zb=-0.285,0.015; nx=int(round((xb-xa)/CELL)); nz=int(round((zb-za)/CELL)); dx=(xb-xa)/nx; dz=(zb-za)/nz
+    for k,(xa,xb) in enumerate(((0.155,0.665),(-0.665,-0.155))):
+        za,zb=-0.30,0.015; nx=int(round((xb-xa)/CELL)); nz=int(round((zb-za)/CELL)); dx=(xb-xa)/nx; dz=(zb-za)/nz
         P={}
         for i in range(nx+1):
             for j in range(nz+1):
