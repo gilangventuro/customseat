@@ -135,13 +135,29 @@ if os.environ.get('DENT_FIX','1')=='1':
         _ring=np.nonzero((_r>1.5)&(_r<2.4))[0]
         if len(_ring)<5: print('dent: ring kosong',_cx); continue
         _yr=_U[_ring,1]; _yf=np.median(_yr[_yr<_yr.min()+0.04])
-        _reg=np.nonzero((_r<1.25)&(_U[:,1]<_yf+0.07)&(_U[:,1]>_yf-0.03))[0]
+        _reg=np.nonzero((_r<1.4)&(_U[:,1]<_yf+0.30)&(_U[:,1]>_yf-0.03))[0]
         _m=np.zeros(_nu,bool); _m[_reg]=True
+        _all=np.nonzero(_r<1.4)[0]; print('dent y semua',np.round(np.percentile(_U[_all,1],[0,5,25,50,75,95,100]),3),'yf',round(_yf,3))
         _y0=_U[_reg,1].copy()
         for _it in range(300):
             _acc=np.zeros((_nu,3)); np.add.at(_acc,_ea,_U[_eb])
             _new=_acc/np.maximum(_deg,1)[:,None]
             _U[_m]=_new[_m]
+        # permukaan akhir = polinomial kubik dari cincin sekitar (tanpa bintik), memudar ke hasil membran di tepi
+        _rg=_ring[_U[_ring,1]<_yf+0.1] if _cx>0 else _ring[:0]
+        _uu=(_U[:,0]-_cx)/RX; _vv=(_U[:,2]-_cz)/RZ
+        def _bs(u,v): return np.stack([np.ones_like(u),u,v,u*u,u*v,v*v,u**3,u*u*v,u*v*v,v**3],1)
+        if len(_rg)>=10: _co,*_=np.linalg.lstsq(_bs(_uu[_rg],_vv[_rg]),_U[_rg,1],rcond=None)
+        if len(_rg)>=10:
+            _in=np.nonzero(_r<1.5)[0]; _yfit=_bs(_uu[_in],_vv[_in])@_co
+            _wf=np.clip((1.5-_r[_in])/0.3,0,1); _okm=(_U[_in,1]<_yf+0.30)&(_U[_in,1]>_yf-0.03)
+            _U[_in,1]=np.where(_okm,_U[_in,1]+_wf*(_yfit-_U[_in,1]),_U[_in,1])
+        # haluskan juga pinggiran sekitarnya dengan bobot memudar supaya tidak ada kerutan/bekas
+        _bd=np.nonzero((_r<3.2)&(np.abs(_U[:,1]-_yf)<0.03))[0]
+        _w=np.zeros(_nu); _w[_bd]=np.clip((3.2-_r[_bd])/(3.2-1.25),0,1)
+        for _it in range(int(os.environ.get('DENT_IT2','250'))):
+            _acc=np.zeros((_nu,3)); np.add.at(_acc,_ea,_U[_eb]); _nw=_acc/np.maximum(_deg,1)[:,None]
+            _U+=(0.5*_w)[:,None]*(_nw-_U)
         print('dent',_cx,'titik',len(_reg),'y permukaan',round(_yf,4),'geser maks',round(float(np.abs(_U[_reg,1]-_y0).max()),4))
     _W2=_U[_uid]; _P2=(_W2-_M[:3,3])@_Mi[:3,:3].T
     me.vertices.foreach_set('co',_P2.ravel()); me.update()
