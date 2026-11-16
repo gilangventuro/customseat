@@ -243,6 +243,7 @@ if REAR and PN:   # area merah (label 3 = 4_TidakBisaDiganti) di belakang sandar
     for _dx in (0.0,DXR):
         _rm|=(lab[:len(_c)]==3)&(_c[:,0]>X0+_dx)&(_c[:,0]<X1+_dx)&(_c[:,2]>Z0)&(_c[:,2]<Z1)&(_c[:,1]>Y0)&(part==0)
     part[_rm]=9; print('area merah belakang dibuang',int(_rm.sum()),'face')
+    RC=_c[_rm&(_c[:,0]<X1)&(_c[:,0]>X0)]   # pusat face area merah jok kiri (untuk menempelkan cangkang baru)
 sm=None
 if TH:
     sm=bpy.data.materials.new('leather_stitch'); sm.use_nodes=True
@@ -363,6 +364,83 @@ if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk k
         bm=bmesh.new(); bm.from_mesh(ob.data)
         bmesh.ops.dissolve_limit(bm,angle_limit=math.radians(0.6),verts=bm.verts,edges=bm.edges,delimit={'MATERIAL'})
         bmesh.ops.triangulate(bm,faces=bm.faces); bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    # tempelkan: putar (sumbu x) dan geser cangkang agar sejajar & berimpit dengan area merah yang dibuang
+    if os.environ.get('REAR_FIT','1')=='1' and len(RC)>100:
+        big=max(kidsR,key=lambda k_:len(k_.data.polygons))
+        SV=np.array([[v.co.x,v.co.y,v.co.z] for v in big.data.vertices])
+        def axis(Y):
+            Y=Y-Y.mean(0); u,sv,vt=np.linalg.svd(Y,full_matrices=False); d=vt[0]
+            return d if d[1]>0 else -d   # arah sepanjang tinggi sandaran, (dy,dz) dgn dz>0
+        def ang(P):
+            d=axis(P[:,1:3]-0)
+            if d[1]<0: d=-d
+            return math.atan2(d[1],d[0])
+        a_s=ang(SV); a_r=ang(RC); dth=a_r-a_s
+        cs=SV.mean(0); cr=RC.mean(0)
+        print('fit: sudut shell',round(math.degrees(a_s),1),'merah',round(math.degrees(a_r),1),'putar',round(math.degrees(dth),1),'pusat shell',np.round(cs,3),'merah',np.round(cr,3))
+        dy=float(os.environ.get('REAR_DY','0.0')); dz=float(os.environ.get('REAR_DZ','0.0'))
+        T=mathutils.Matrix.Translation((cr[0]-cs[0],cr[1]+dy,cr[2]+dz))@mathutils.Matrix.Rotation(dth,4,'X')@mathutils.Matrix.Translation((0,-cs[1],-cs[2]))
+        for ob in kidsR: ob.data.transform(T); ob.data.update()
+        # penyempurnaan: cari putaran (sumbu x) + geser y agar bagian depan cangkang menempel ke punggung badan sepanjang tinggi tanpa menembus
+        if os.environ.get('REAR_REFINE','1')=='1':
+            _M2=np.array(o.matrix_world); _Pb=np.empty(len(me.vertices)*3); me.vertices.foreach_get('co',_Pb); _Pb=_Pb.reshape(-1,3); _Wb=_Pb@_M2[:3,:3].T+_M2[:3,3]
+            _cx0,_cx1=X0+0.12,X1-0.12   # bagian tengah jok kiri
+            _bb=_Wb[(_Wb[:,0]>_cx0)&(_Wb[:,0]<_cx1)&(_Wb[:,2]>-0.3)&(_Wb[:,2]<0.62)]
+            BIN=0.025; zb=np.arange(-0.3,0.62,BIN)
+            body_rear=np.full(len(zb),np.nan)
+            for i_,z_ in enumerate(zb):
+                m_=(_bb[:,2]>=z_)&(_bb[:,2]<z_+BIN)
+                if m_.sum()>20: body_rear[i_]=np.percentile(_bb[m_,1],99.8)
+            big2=max(kidsR,key=lambda k_:len(k_.data.polygons))
+            SV2=np.array([[v.co.x,v.co.y,v.co.z] for v in big2.data.vertices]); SV2=SV2[(SV2[:,0]>_cx0)&(SV2[:,0]<_cx1)]
+            SV2=SV2[::max(1,len(SV2)//4000)]
+            piv=np.array([SV2[:,1].mean(),SV2[:,2].min()])   # putar terhadap tepi bawah
+            best=None
+            for th in np.radians(np.arange(-12,12.01,0.5)):
+                c_,s_=math.cos(th),math.sin(th)
+                yy=(SV2[:,1]-piv[0])*c_-(SV2[:,2]-piv[1])*s_+piv[0]; zz=(SV2[:,1]-piv[0])*s_+(SV2[:,2]-piv[1])*c_+piv[1]
+                idx=np.floor((zz-zb[0])/BIN).astype(int); ok=(idx>=0)&(idx<len(zb))
+                front=np.full(len(zb),np.nan)
+                for i_ in np.unique(idx[ok]):
+                    q=yy[ok&(idx==i_)]
+                    if len(q)>=5: front[i_]=np.percentile(q,5)
+                gap0=front-body_rear; v_=~np.isnan(gap0)
+                if v_.sum()<10: continue
+                dy_=-(np.nanmin(gap0)-float(os.environ.get('REAR_TOUCH','-0.003')))   # geser y sampai celah minimum = -0.003 (menempel)
+                g=gap0[v_]+dy_
+                sc_=np.mean(g)
+                if best is None or sc_<best[0]: best=(sc_,th,dy_,g.max())
+            if best:
+                sc_,th,dy_,gm=best; print('refine: putar',round(math.degrees(th),1),'geser y',round(dy_,4),'celah rata-rata',round(sc_,4),'celah maks',round(gm,4))
+                c_,s_=math.cos(th),math.sin(th)
+                Tr=mathutils.Matrix.Translation((0,piv[0]+dy_,piv[1]))@mathutils.Matrix.Rotation(th,4,'X')@mathutils.Matrix.Translation((0,-piv[0],-piv[1]))
+                for ob in kidsR: ob.data.transform(Tr); ob.data.update()
+            # lengkungkan: geser y tiap titik cangkang menurut tinggi z agar sisi depannya menempel di profil punggung badan (badan melengkung, cangkang lurus)
+            if os.environ.get('REAR_WARP','1')=='1':
+                allv=[]
+                for ob in kidsR:
+                    a_=np.empty(len(ob.data.vertices)*3); ob.data.vertices.foreach_get('co',a_); allv.append(a_.reshape(-1,3))
+                AV=np.vstack(allv); AVc=AV[(AV[:,0]>_cx0)&(AV[:,0]<_cx1)]
+                zc=zb+BIN/2; fr=np.full(len(zb),np.nan)
+                for i_ in range(len(zb)):
+                    m_=(AVc[:,2]>=zb[i_])&(AVc[:,2]<zb[i_]+BIN)
+                    if m_.sum()>=5: fr[i_]=np.percentile(AVc[m_,1],3)
+                dd=body_rear+float(os.environ.get('REAR_WARP_TOUCH','0.012'))-fr; ok_=~np.isnan(dd)
+                if ok_.sum()>5:
+                    dd=np.interp(zc,zc[ok_],dd[ok_])
+                    k5=np.ones(5)/5; dp=np.pad(dd,2,mode='edge'); dd=np.convolve(dp,k5,mode='valid')
+                    for ob,a_ in zip(kidsR,allv):
+                        a2=a_.copy(); a2[:,1]+=np.interp(a2[:,2],zc,dd)
+                        ob.data.vertices.foreach_set('co',a2.ravel()); ob.data.update()
+                    print('lengkung: geser y min',round(dd.min(),3),'maks',round(dd.max(),3))
+                    # buang bagian kecil yang tetap melayang jauh di belakang badan
+                    okb=~np.isnan(body_rear); brz=np.interp(zc,zc[okb],body_rear[okb]); bigR=max(kidsR,key=lambda k_:len(k_.data.polygons))
+                    for ob in list(kidsR):
+                        if ob is bigR: continue
+                        a_=np.empty(len(ob.data.vertices)*3); ob.data.vertices.foreach_get('co',a_); a_=a_.reshape(-1,3)
+                        gp=float(np.min(a_[:,1]-np.interp(a_[:,2],zc,brz)))
+                        if gp>float(os.environ.get('REAR_FLOAT','0.04')):
+                            print('buang bagian melayang',ob.name,len(ob.data.polygons),'celah',round(gp,3)); kidsR.remove(ob); bpy.data.objects.remove(ob)
     allR=sum(len(k_.data.polygons) for k_ in kidsR); ratioR=min(1.0,float(os.environ.get('REAR_TARGET','45000'))/allR); print('cangkang belakang face',allR,'rasio',round(ratioR,3))
     mtR=bpy.data.materials.new('hitam_belakang'); mtR.use_nodes=True; nt=mtR.node_tree; nt.nodes.clear()
     out_=nt.nodes.new('ShaderNodeOutputMaterial'); bs_=nt.nodes.new('ShaderNodeBsdfPrincipled'); bs_.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs_.inputs['Roughness'].default_value=0.5; bs_.inputs['Metallic'].default_value=0.0
@@ -380,7 +458,9 @@ if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk k
         d=ob.copy(); d.data=ob.data.copy(); d.name=ob.name.replace('Kiri','Kanan'); bpy.context.scene.collection.objects.link(d)
         d.data.transform(mathutils.Matrix.Translation((DXR,0,0)))
     for ob in objsR:
-        if ob.type=='EMPTY': bpy.data.objects.remove(ob)
+        try:
+            if ob.type=='EMPTY': bpy.data.objects.remove(ob)
+        except ReferenceError: pass
     print('cangkang belakang ditambahkan, total face',sum(len(k_.data.polygons) for k_ in kidsR)*2)
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
