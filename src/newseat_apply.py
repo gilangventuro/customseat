@@ -28,7 +28,47 @@ if RED:
     bm.to_mesh(me0); bm.free(); me0.update()
     print('lever faces mirrored',len(sel))
     lab=np.concatenate([lab,lab[sel]])
-me=o.data; me.materials.clear()
+me=o.data
+# Haluskan permukaan atas sandaran (kerutan/duri hasil Meshy). Taubin (lambda|mu) supaya tidak menyusut; hanya z>ZLO (jahitan semuanya di bawah z=0.6)
+if os.environ.get('HR_SMOOTH','1')=='1':
+    ZLO=float(os.environ.get('HR_ZLO','0.60')); ZHI=float(os.environ.get('HR_ZHI','0.67')); IT=int(os.environ.get('HR_IT','80'))
+    nv=len(me.vertices); P=np.empty(nv*3,np.float64); me.vertices.foreach_get('co',P); P=P.reshape(-1,3)
+    ed=np.empty(len(me.edges)*2,np.int32); me.edges.foreach_get('vertices',ed); ed=ed.reshape(-1,2)
+    # titik kembar (posisi sama, terputus di jahitan/UV) disatukan dulu supaya celah retak ikut tertutup
+    _,uid=np.unique(np.round(P*1e5).astype(np.int64),axis=0,return_inverse=True); uid=uid.ravel(); nu=uid.max()+1
+    print('titik',nv,'unik',nu)
+    a_=np.concatenate([uid[ed[:,0]],uid[ed[:,1]]]); b_=np.concatenate([uid[ed[:,1]],uid[ed[:,0]]])
+    k_=np.unique(a_.astype(np.int64)*nu+b_); a_=(k_//nu).astype(np.int64); b_=(k_%nu).astype(np.int64)
+    deg=np.bincount(a_,minlength=nu).astype(np.float64)
+    w=np.clip((P[:,2]-ZLO)/(ZHI-ZLO),0,1)[:,None]; w=w*w*(3-2*w)
+    def lap(Q):
+        s=np.zeros((nu,3))
+        for c in range(3): s[:,c]=np.bincount(a_,weights=Q[b_,c],minlength=nu)
+        return np.where(deg[:,None]>0,s/np.maximum(deg,1)[:,None]-Q,0)
+    MU=float(os.environ.get('HR_MU','0.53')); cnt=np.bincount(uid,minlength=nu).astype(np.float64)
+    U=np.zeros((nu,3))
+    for c in range(3): U[:,c]=np.bincount(uid,weights=P[:,c],minlength=nu)/cnt
+    wu=np.zeros((nu,1)); wu[uid]=w
+    for _ in range(IT):
+        U=U+0.5*wu*lap(U); U=U-MU*wu*lap(U)
+    # tahap 2: haluskan hanya searah normal (menutup alur sempit/kerutan tipis yang tidak hilang oleh Laplacian biasa)
+    Nrm=np.zeros((nu,3)); me.update(); vn0=np.empty(nv*3); me.vertex_normals.foreach_get('vector',vn0); vn0=vn0.reshape(-1,3)
+    for c in range(3): Nrm[:,c]=np.bincount(uid,weights=vn0[:,c],minlength=nu)/cnt
+    for _ in range(20): Nrm=Nrm+0.5*lap(Nrm)
+    Nrm/=np.maximum(np.linalg.norm(Nrm,axis=1,keepdims=True),1e-9)
+    for _ in range(int(os.environ.get('HR_IT2','0'))):
+        L=lap(U); U=U+0.8*wu*(L*Nrm).sum(1,keepdims=True)*Nrm
+    P=P+(U[uid]-np.array([np.bincount(uid,weights=P[:,c],minlength=nu)/cnt for c in range(3)]).T[uid])*(w>0)
+    me.vertices.foreach_set('co',P.ravel()); me.update()
+    # normal bawaan (custom) masih memuat kerutan lama -> ganti dengan normal geometri baru di area yang dihaluskan
+    if me.has_custom_normals:
+        nl=len(me.loops); li=np.empty(nl,np.int32); me.loops.foreach_get('vertex_index',li)
+        old_n=np.empty(nl*3,np.float64); me.corner_normals.foreach_get('vector',old_n); old_n=old_n.reshape(-1,3)
+        vn=np.empty(nv*3,np.float64); me.vertex_normals.foreach_get('vector',vn); vn=vn.reshape(-1,3)
+        wl=w[li]; nn=old_n*(1-wl)+vn[li]*wl; nn/=np.maximum(np.linalg.norm(nn,axis=1,keepdims=True),1e-9)
+        me.normals_split_custom_set(nn.tolist()); me.update()
+    print('haluskan sandaran: verts',int((w[:,0]>0).sum()),'iter',IT)
+me.materials.clear()
 base=bpy.data.images.load(BASE); norm=bpy.data.images.load(NORM); norm.colorspace_settings.name='Non-Color'
 def mk(name,rough):
     m=bpy.data.materials.new(name); m.use_nodes=True
