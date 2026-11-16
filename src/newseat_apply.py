@@ -161,6 +161,51 @@ if os.environ.get('DENT_FIX','1')=='1':
         print('dent',_cx,'titik',len(_reg),'y permukaan',round(_yf,4),'geser maks',round(float(np.abs(_U[_reg,1]-_y0).max()),4))
     _W2=_U[_uid]; _P2=(_W2-_M[:3,3])@_Mi[:3,:3].T
     me.vertices.foreach_set('co',_P2.ravel()); me.update()
+# Tambal lubang/kawah kecil di sisi dalam kedua jok (dekat handrest tengah): lempeng cakram halus mengikuti permukaan sekitar, UV & material dari tetangga
+if os.environ.get('HOLE_FIX','1')=='1':
+    import bmesh, mathutils
+    _M=np.array(o.matrix_world); _Mi=np.linalg.inv(_M)
+    _nv=len(me.vertices); _P=np.empty(_nv*3,np.float64); me.vertices.foreach_get('co',_P); _P=_P.reshape(-1,3); _W=_P@_M[:3,:3].T+_M[:3,3]
+    bm=bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); uvl=bm.loops.layers.uv.active
+    nf0=len(bm.faces); addlab=[]
+    for _oo in (1,-1):
+        for _cy,_cz,_R in [(0.246,-0.393,0.03),(0.05,-0.448,0.02),(0.279,-0.48,0.02)]:
+            bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table()
+            _side=(_W[:,0]*_oo<=0.002)&(np.abs(_W[:,0])<0.3)
+            _r=np.hypot(_W[:,1]-_cy,_W[:,2]-_cz)/_R
+            _ring=np.nonzero(_side&(_r>1.5)&(_r<2.8))[0]
+            if len(_ring)<8: print('tambal: ring kosong',_oo,_cy,_cz); continue
+            _xr=_W[_ring,0]*_oo; _rg=_ring[_xr>_xr.max()-0.015]
+            if len(_rg)<8: print('tambal: ring sempit',_oo,_cy,_cz); continue
+            _u=(_W[_rg,1]-_cy)/_R; _v=(_W[_rg,2]-_cz)/_R
+            _bs=lambda u,v: np.stack([np.ones_like(u),u,v,u*u,u*v,v*v],1)
+            _co,*_=np.linalg.lstsq(_bs(_u,_v),_W[_rg,0],rcond=None)
+            _uv=np.array([list(bm.verts[int(i)].link_loops[0][uvl].uv) for i in _rg])
+            _A=np.stack([np.ones_like(_u),_u,_v],1); _cu,*_=np.linalg.lstsq(_A,_uv,rcond=None)
+            _res=np.linalg.norm(_A@_cu-_uv,axis=1); _ok=_res<=max(2*_res.std(),1e-4)
+            if _ok.sum()>=6: _cu,*_=np.linalg.lstsq(_A[_ok],_uv[_ok],rcond=None)
+            labs=[int(lab[l.face.index]) for i in _rg for l in bm.verts[int(i)].link_loops if l.face.index<nf0]
+            _ml=max(set(labs),key=labs.count) if labs else 0
+            g=bmesh.new()
+            c=bmesh.ops.create_circle(g,cap_ends=True,cap_tris=True,segments=20,radius=1.0)
+            bmesh.ops.subdivide_edges(g,edges=list(g.edges),cuts=2,use_grid_fill=True)
+            if _oo<0: bmesh.ops.reverse_faces(g,faces=list(g.faces))
+            RP=1.35; mp={}
+            for gv in g.verts:
+                pu=gv.co.x*RP; pv=gv.co.y*RP
+                xx=float(_bs(np.array([pu]),np.array([pv]))@_co)+0.0006*_oo
+                mp[gv.index]=bm.verts.new((xx,_cy+pu*_R,_cz+pv*_R))
+            g.verts.ensure_lookup_table()
+            for gf in g.faces:
+                nfc=bm.faces.new([mp[v.index] for v in gf.verts]); nfc.smooth=True
+                for l in nfc.loops:
+                    pu=(l.vert.co.y-_cy)/_R; pv=(l.vert.co.z-_cz)/_R
+                    l[uvl].uv=tuple(np.array([1,pu,pv])@_cu)
+                addlab.append(_ml)
+            g.free()
+            print('tambal',_oo,_cy,_cz,'face',len(g.faces) if False else 'ok','material',_ml)
+    bm.to_mesh(me); bm.free(); me.update()
+    if addlab: lab=np.concatenate([lab,np.array(addlab,dtype=lab.dtype)])
 me.materials.clear()
 base=bpy.data.images.load(BASE); norm=bpy.data.images.load(NORM); norm.colorspace_settings.name='Non-Color'
 def mk(name,rough):
