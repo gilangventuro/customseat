@@ -573,7 +573,7 @@ ACC.forEach(a => { a.nodes = []; a.base = []; a.dir = new THREE.Vector3(); a.tar
 function setupAccessories(){
   ACC.forEach(a => {
     a.nodes = []; a.base = [];
-    model.traverse(n => { if (n.isMesh && n.name.includes(a.match)) { a.nodes.push(n); a.base.push(n.position.clone());
+    model.traverse(n => { if (n.isMesh && (n.name.includes(a.match) || (n.parent && n.parent!==model && n.parent.name.includes(a.match)))) { a.nodes.push(n); a.base.push(n.position.clone());
       /* material tiap bagian di-clone agar bisa memudar sendiri tanpa memengaruhi bagian lain */
       n.material = Array.isArray(n.material) ? n.material.map(m => m.clone()) : n.material.clone(); } });
     if (!a.nodes.length) return;
@@ -698,7 +698,7 @@ new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp', tex => 
   tintBaseTexture = tex;
 });
 const origMap = {};
-loader.load('assets/twin-seat-meshy.glb?v=20261116c',
+loader.load('assets/twin-seat-meshy.glb?v=20261116d',
   gltf => {
     model = gltf.scene;
 
