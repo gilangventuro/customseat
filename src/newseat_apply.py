@@ -220,6 +220,26 @@ if HB:   # handrest kiri baru dari rakitan di blend pengguna (nama Handrest_Kiri
     for ob in d1.objects:
         if ob.type=='EMPTY': bpy.data.objects.remove(ob)
     print('handrest baru total face',tot)
+    # isi padat: rumah handrest berongga di sisi dalam (nampak kopong dari depan) -> tutup dengan lempeng padat sampai badan kursi
+    if os.environ.get('HAND_ISI','1')=='1':
+        import mathutils
+        def span(o,ax): 
+            vs=[v.co[ax] for v in o.data.vertices]; return max(vs)-min(vs), max(vs)
+        cand=[o for o in kids if max(v.co.z for v in o.data.vertices)<-0.25]
+        hs=max(cand,key=lambda o:span(o,1)[0]) if cand else None
+        if hs:
+            mx=max(v.co.x for v in hs.data.vertices); XB=float(os.environ.get('ISI_XB','-0.66')); TH=float(os.environ.get('ISI_TH','0.05'))
+            pts=[v.co.copy() for v in hs.data.vertices if v.co.x>mx-TH][::3]
+            bm=bmesh.new()
+            for q in pts: bm.verts.new(q); bm.verts.new((XB,q.y,q.z))
+            bmesh.ops.convex_hull(bm,input=list(bm.verts))
+            for f in list(bm.faces): f.smooth=True
+            hm=bpy.data.meshes.new('IsiRumahHandrest'); bm.to_mesh(hm); bm.free()
+            ho=bpy.data.objects.new('Handrest_Kiri_Isi',hm); bpy.context.scene.collection.objects.link(ho)
+            for pl in hm.polygons: pl.use_smooth=True
+            mt=bpy.data.materials.new('isi_hitam'); mt.use_nodes=True; bs=mt.node_tree.nodes.get('Principled BSDF')
+            bs.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs.inputs['Roughness'].default_value=0.5
+            hm.materials.append(mt); print('isi rumah handrest',hs.name,len(hm.polygons),'x',round(mx,3),'->',XB)
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)
