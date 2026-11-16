@@ -384,7 +384,7 @@ if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk k
         # penyempurnaan: cari putaran (sumbu x) + geser y agar bagian depan cangkang menempel ke punggung badan sepanjang tinggi tanpa menembus
         if os.environ.get('REAR_REFINE','1')=='1':
             _M2=np.array(o.matrix_world); _Pb=np.empty(len(me.vertices)*3); me.vertices.foreach_get('co',_Pb); _Pb=_Pb.reshape(-1,3); _Wb=_Pb@_M2[:3,:3].T+_M2[:3,3]
-            _cx0,_cx1=X0+0.12,X1-0.12   # bagian tengah jok kiri
+            _cx0,_cx1=X0+float(os.environ.get('REAR_CXM','0.12')),X1-float(os.environ.get('REAR_CXM','0.12'))   # lebar jok kiri
             _bb=_Wb[(_Wb[:,0]>_cx0)&(_Wb[:,0]<_cx1)&(_Wb[:,2]>-0.3)&(_Wb[:,2]<0.62)]
             BIN=0.025; zb=np.arange(-0.3,0.62,BIN)
             body_rear=np.full(len(zb),np.nan)
