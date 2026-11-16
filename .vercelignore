@@ -1,2 +1,4 @@
 _tmp*
 *.blend
+*.blend1
+*.npz
