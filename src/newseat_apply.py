@@ -116,9 +116,7 @@ if PN:
         print('bagian',nm,len(nm_.polygons))
     bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
     seam=[e for e in bm.edges if len(e.link_faces)>=2 and any(part[f.index]==0 for f in e.link_faces) and any(part[f.index]!=0 for f in e.link_faces)]
-    FB=os.environ.get('FRAME_BLEND'); ZC=float(os.environ.get('FRAME_ZC','-0.62'))
-    dele=lambda f: part[f.index]!=0 or (FB and all(v.co.z<ZC for v in f.verts))   # rangka lama (di bawah ZC) dibuang bila rangka baru dipasang
-    bmesh.ops.delete(bm,geom=[f for f in bm.faces if dele(f)],context='FACES')
+    bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=0],context='FACES')
     bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
     # tutup lubang bekas bagian yang dilepas (bagian dalam badan jadi tidak terlihat bolong)
     seam=[e for e in seam if e.is_valid and e.is_boundary]
@@ -130,13 +128,6 @@ if PN:
     for f in capf: f.material_index=3; f.smooth=True
     print('tutup lubang: sisi',len(seam),'face penutup',len(capf))
     bm.to_mesh(me); bm.free()
-FB=os.environ.get('FRAME_BLEND')
-if FB:   # rangka baru dari scan (objek 'Rangka'), material grey
-    with bpy.data.libraries.load(FB) as (d0,d1): d1.objects=['Rangka']
-    ro=d1.objects[0]; bpy.context.scene.collection.objects.link(ro); ro.name='Rangka'
-    rm_=bpy.data.materials.new('rangka_grey'); rm_.use_nodes=True; bb=rm_.node_tree.nodes['Principled BSDF']
-    bb.inputs['Base Color'].default_value=(0.30,0.31,0.33,1); bb.inputs['Roughness'].default_value=0.5; bb.inputs['Metallic'].default_value=0.4
-    ro.data.materials.clear(); ro.data.materials.append(rm_); print('rangka baru',len(ro.data.polygons))
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)
