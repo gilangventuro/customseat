@@ -151,7 +151,7 @@ if TH:
     qpart=np.load(os.environ['QPART_NPY']) if os.environ.get('QPART_NPY') else np.zeros(len(V)//4,np.int8)   # bagian per quad (dihitung di luar Blender: src/newseat_qpart.py)
     fpart=qpart[np.arange(len(F))//2]     # 2 segitiga per quad
     for k in sorted(set(fpart.tolist())):
-        if HB and k in (1,2): continue   # jahitan handrest kiri lama diganti handrest baru
+        if HB and k in (1,2,5): continue   # jahitan handrest kiri lama diganti handrest baru
         sel=F[fpart==k]; used=np.unique(sel); remap=-np.ones(len(V),np.int64); remap[used]=np.arange(len(used))
         tm=bpy.data.meshes.new('JahitanMesh%d'%k); tm.from_pydata(V[used].tolist(),[],remap[sel].tolist()); tm.update()
         to=bpy.data.objects.new('Jahitan' if k==0 else 'Jahitan_'+NAMES[k],tm); bpy.context.scene.collection.objects.link(to)
@@ -160,7 +160,7 @@ if TH:
 if PN:
     import bmesh
     for k,nm in NAMES.items():
-        if HB and k in (1,2): continue
+        if HB and k in (1,2,5): continue
         bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
         bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=k],context='FACES')
         bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
@@ -183,20 +183,20 @@ if PN:
     print('tutup lubang: sisi',len(seam),'face penutup',len(capf))
     bm.to_mesh(me); bm.free()
 
-for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem2",1,1)]:
+for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem2",1,1),("Tengah","Assem1--OPSI 3",5,0)]:
     if HB:   # handrest baru dari rakitan di blend pengguna (nama Handrest_Kiri_NN supaya animasi lepas/pasang di web tetap jalan)
         RATIO=float(os.environ.get('HAND_RATIO','0.12'))
         if 'ALLOBJ' not in globals():
             with bpy.data.libraries.load(HB) as (d0,d1_): d1_.objects=[n for n in d0.objects if n not in ('Kursi MESH','Mesh_0.001')]
             ALLOBJ=[o for o in d1_.objects if o]
-            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2')}
+            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2','Assem1--OPSI 3')}
         class _S: pass
         d1=_S(); d1.objects=SELS[ASM]
         for ob in d1.objects: bpy.context.scene.collection.objects.link(ob)
         bpy.context.view_layer.update()
         import bmesh, mathutils
         kids=[ob for ob in d1.objects if ob.type=='MESH']; tot=0
-        GELAP={'defaultplastic.001','defaultplastic.002','defaultplastic.004','defaultplastic.008','satinfinishaluminum','satinfinishaluminum.001','Material_5','Material_6','defaultplastic.018','defaultplastic.019','defaultplastic.020','defaultplastic.021','defaultplastic.022','defaultplastic.023'}   # abu-abu & silver -> hitam
+        GELAP={'defaultplastic.001','defaultplastic.002','defaultplastic.004','defaultplastic.008','satinfinishaluminum','satinfinishaluminum.001','Material_5','Material_6','defaultplastic.018','defaultplastic.019','defaultplastic.020','defaultplastic.021','defaultplastic.022','defaultplastic.023','defaultplastic.012','defaultplastic.013','defaultplastic.014','defaultplastic.015','defaultplastic.016','defaultplastic.017','polishedaluminum'}   # abu-abu & silver -> hitam
         for i,ob in enumerate(kids):
             M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
             bpy.context.view_layer.objects.active=ob; ob.select_set(True)
@@ -230,7 +230,7 @@ for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem
             if ob.type=='EMPTY': bpy.data.objects.remove(ob)
         print('handrest baru total face',tot)
         # isi padat: rumah handrest berongga di sisi dalam (nampak kopong dari depan) -> tutup dengan lempeng padat sampai badan kursi
-        if os.environ.get('HAND_ISI','1')=='1':
+        if os.environ.get('HAND_ISI','1')=='1' and SGN!=0:
             import mathutils
             def span(o,ax): 
                 vs=[v.co[ax] for v in o.data.vertices]; return max(vs)-min(vs), max(vs)
