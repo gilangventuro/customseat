@@ -142,6 +142,7 @@ part=np.zeros(len(me.polygons),np.int8)
 if PN:
     pp=np.load(PN); m_=min(len(pp),len(part)); part[:m_]=pp[:m_]
 TH=os.environ.get('THREAD_NPZ')
+HB=os.environ.get('HAND_BLEND')   # blend berisi handrest kiri baru (rakitan beberapa objek) pengganti Handrest_Kiri
 sm=None
 if TH:
     sm=bpy.data.materials.new('leather_stitch'); sm.use_nodes=True
@@ -150,6 +151,7 @@ if TH:
     qpart=np.load(os.environ['QPART_NPY']) if os.environ.get('QPART_NPY') else np.zeros(len(V)//4,np.int8)   # bagian per quad (dihitung di luar Blender: src/newseat_qpart.py)
     fpart=qpart[np.arange(len(F))//2]     # 2 segitiga per quad
     for k in sorted(set(fpart.tolist())):
+        if HB and k==2: continue   # jahitan handrest kiri lama diganti handrest baru
         sel=F[fpart==k]; used=np.unique(sel); remap=-np.ones(len(V),np.int64); remap[used]=np.arange(len(used))
         tm=bpy.data.meshes.new('JahitanMesh%d'%k); tm.from_pydata(V[used].tolist(),[],remap[sel].tolist()); tm.update()
         to=bpy.data.objects.new('Jahitan' if k==0 else 'Jahitan_'+NAMES[k],tm); bpy.context.scene.collection.objects.link(to)
@@ -158,6 +160,7 @@ if TH:
 if PN:
     import bmesh
     for k,nm in NAMES.items():
+        if HB and k==2: continue
         bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
         bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=k],context='FACES')
         bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
@@ -179,6 +182,24 @@ if PN:
     for f in capf: f.material_index=3; f.smooth=True
     print('tutup lubang: sisi',len(seam),'face penutup',len(capf))
     bm.to_mesh(me); bm.free()
+if HB:   # handrest kiri baru dari rakitan di blend pengguna (nama Handrest_Kiri_NN supaya animasi lepas/pasang di web tetap jalan)
+    RATIO=float(os.environ.get('HAND_RATIO','0.12'))
+    with bpy.data.libraries.load(HB) as (d0,d1): d1.objects=[n for n in d0.objects if n=='Assem--KAKI BANGKU SUZUKI' or n.startswith(('(OPSI','AS ROTOR','BESI AR','HOUSING','KARET','KEPALA SAFETY','PART','PUSH BOTTOM','ROTOR'))]
+    for ob in d1.objects: bpy.context.scene.collection.objects.link(ob)
+    bpy.context.view_layer.update()
+    kids=[ob for ob in d1.objects if ob.type=='MESH']; tot=0
+    for i,ob in enumerate(kids):
+        M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
+        bpy.context.view_layer.objects.active=ob; ob.select_set(True)
+        bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+        n0=len(ob.data.polygons)
+        if n0>2000:
+            md=ob.modifiers.new('dec','DECIMATE'); md.ratio=RATIO; bpy.ops.object.modifier_apply(modifier='dec')
+        for pl in ob.data.polygons: pl.use_smooth=True
+        ob.name='Handrest_Kiri_%02d'%i; tot+=len(ob.data.polygons); print('handrest baru',ob.name,n0,'->',len(ob.data.polygons))
+    for ob in d1.objects:
+        if ob.type=='EMPTY': bpy.data.objects.remove(ob)
+    print('handrest baru total face',tot)
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)
