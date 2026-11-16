@@ -119,6 +119,32 @@ if os.environ.get('NET','1')=='1':
         for pl in jm.polygons: pl.use_smooth=False
         jo=bpy.data.objects.new('Jaring_Kanan' if k==0 else 'Jaring_Kiri',jm); bpy.context.scene.collection.objects.link(jo)
         print('jaring',k,len(F),'tri')
+# Ratakan cekungan kecil (lubang) di sisi luar atas sandaran: isi dengan permukaan halus dari tepi sekitarnya (membran Laplace)
+if os.environ.get('DENT_FIX','1')=='1':
+    _M=np.array(o.matrix_world); _Mi=np.linalg.inv(_M)
+    _nv=len(me.vertices); _P=np.empty(_nv*3,np.float64); me.vertices.foreach_get('co',_P); _P=_P.reshape(-1,3); _W=_P@_M[:3,:3].T+_M[:3,3]
+    _ed=np.empty(len(me.edges)*2,np.int32); me.edges.foreach_get('vertices',_ed); _ed=_ed.reshape(-1,2)
+    _,_uid=np.unique(np.round(_W*1e5).astype(np.int64),axis=0,return_inverse=True); _uid=_uid.ravel(); _nu=_uid.max()+1
+    _U=np.zeros((_nu,3)); _U[_uid]=_W
+    _ea=np.concatenate([_uid[_ed[:,0]],_uid[_ed[:,1]]]); _eb=np.concatenate([_uid[_ed[:,1]],_uid[_ed[:,0]]])
+    _deg=np.bincount(_ea,minlength=_nu).astype(np.float64)
+    RX=float(os.environ.get('DENT_RX','0.026')); RZ=float(os.environ.get('DENT_RZ','0.034'))
+    for _cx in (0.787,-0.788):
+        _cz=0.358
+        _r=np.sqrt(((_U[:,0]-_cx)/RX)**2+((_U[:,2]-_cz)/RZ)**2)
+        _ring=np.nonzero((_r>1.5)&(_r<2.4))[0]
+        if len(_ring)<5: print('dent: ring kosong',_cx); continue
+        _yr=_U[_ring,1]; _yf=np.median(_yr[_yr<_yr.min()+0.04])
+        _reg=np.nonzero((_r<1.25)&(_U[:,1]<_yf+0.07)&(_U[:,1]>_yf-0.03))[0]
+        _m=np.zeros(_nu,bool); _m[_reg]=True
+        _y0=_U[_reg,1].copy()
+        for _it in range(300):
+            _acc=np.zeros((_nu,3)); np.add.at(_acc,_ea,_U[_eb])
+            _new=_acc/np.maximum(_deg,1)[:,None]
+            _U[_m]=_new[_m]
+        print('dent',_cx,'titik',len(_reg),'y permukaan',round(_yf,4),'geser maks',round(float(np.abs(_U[_reg,1]-_y0).max()),4))
+    _W2=_U[_uid]; _P2=(_W2-_M[:3,3])@_Mi[:3,:3].T
+    me.vertices.foreach_set('co',_P2.ravel()); me.update()
 me.materials.clear()
 base=bpy.data.images.load(BASE); norm=bpy.data.images.load(NORM); norm.colorspace_settings.name='Non-Color'
 def mk(name,rough):
