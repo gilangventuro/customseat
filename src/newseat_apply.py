@@ -230,6 +230,19 @@ if PN:
     pp=np.load(PN); m_=min(len(pp),len(part)); part[:m_]=pp[:m_]
 TH=os.environ.get('THREAD_NPZ')
 HB=os.environ.get('HAND_BLEND')   # blend berisi handrest kiri baru (rakitan beberapa objek) pengganti Handrest_Kiri
+REAR=HB and os.environ.get('REAR_NEW','1')=='1'
+if REAR and PN:   # area merah (label 3 = 4_TidakBisaDiganti) di belakang sandaran dibuang, diganti cangkang belakang baru
+    _M=np.array(o.matrix_world); _nv=len(me.vertices); _P=np.empty(_nv*3); me.vertices.foreach_get('co',_P); _P=_P.reshape(-1,3); _W=_P@_M[:3,:3].T+_M[:3,3]
+    _li=np.empty(len(me.loops),np.int32); me.loops.foreach_get('vertex_index',_li); _ls=np.empty(len(me.polygons),np.int32); me.polygons.foreach_get('loop_start',_ls); _lt=np.empty(len(me.polygons),np.int32); me.polygons.foreach_get('loop_total',_lt)
+    _c=np.zeros((len(me.polygons),3))
+    for _k in range(int(_lt.max())):
+        _m=_lt>_k; _c[_m]+=_W[_li[_ls[_m]+_k]]
+    _c/=_lt[:,None]
+    DXR=float(os.environ.get('LEVER_DX','0.827')); X0=float(os.environ.get('REAR_X0','-0.84')); X1=float(os.environ.get('REAR_X1','0.03')); Z0=float(os.environ.get('REAR_Z0','-0.37')); Z1=float(os.environ.get('REAR_Z1','0.62')); Y0=float(os.environ.get('REAR_Y0','0.15'))
+    _rm=np.zeros(len(me.polygons),bool)
+    for _dx in (0.0,DXR):
+        _rm|=(lab[:len(_c)]==3)&(_c[:,0]>X0+_dx)&(_c[:,0]<X1+_dx)&(_c[:,2]>Z0)&(_c[:,2]<Z1)&(_c[:,1]>Y0)&(part==0)
+    part[_rm]=9; print('area merah belakang dibuang',int(_rm.sum()),'face')
 sm=None
 if TH:
     sm=bpy.data.materials.new('leather_stitch'); sm.use_nodes=True
@@ -256,7 +269,7 @@ if PN:
         ob=bpy.data.objects.new(nm,nm_); bpy.context.scene.collection.objects.link(ob)
         print('bagian',nm,len(nm_.polygons))
     bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
-    seam=[e for e in bm.edges if len(e.link_faces)>=2 and any(part[f.index]==0 for f in e.link_faces) and any(part[f.index]!=0 for f in e.link_faces)]
+    seam=[e for e in bm.edges if len(e.link_faces)>=2 and any(part[f.index]==0 for f in e.link_faces) and any(part[f.index] not in (0,9) for f in e.link_faces)]
     bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=0],context='FACES')
     bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
     # tutup lubang bekas bagian yang dilepas (bagian dalam badan jadi tidak terlihat bolong)
@@ -274,9 +287,9 @@ for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem
     if HB:   # handrest baru dari rakitan di blend pengguna (nama Handrest_Kiri_NN supaya animasi lepas/pasang di web tetap jalan)
         RATIO=float(os.environ.get('HAND_RATIO','0.12'))
         if 'ALLOBJ' not in globals():
-            with bpy.data.libraries.load(HB) as (d0,d1_): d1_.objects=[n for n in d0.objects if n not in ('Kursi MESH','Mesh_0.001')]
+            with bpy.data.libraries.load(HB) as (d0,d1_): d1_.objects=[n for n in d0.objects if n not in ('Kursi','Kursi MESH','Mesh_0.001')]
             ALLOBJ=[o for o in d1_.objects if o]
-            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2','Assem1--OPSI 3')}
+            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2','Assem1--OPSI 3','Assem-FRAME GAS SPRING (800N)')}
         class _S: pass
         d1=_S(); d1.objects=SELS[ASM]
         for ob in d1.objects: bpy.context.scene.collection.objects.link(ob)
@@ -336,6 +349,39 @@ for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem
                 mt=bpy.data.materials.new('isi_hitam'); mt.use_nodes=True; bs=mt.node_tree.nodes.get('Principled BSDF')
                 bs.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs.inputs['Roughness'].default_value=0.5
                 hm.materials.append(mt); print('isi rumah handrest',SIDE,hs.name,len(hm.polygons),'x',round(mx,3),'->',XB)
+if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk kedua jok: kiri = aslinya, kanan = salinan digeser (jok identik, tanpa cermin)
+    import bmesh, mathutils
+    ASMR='Assem-FRAME GAS SPRING (800N)'
+    objsR=SELS[ASMR]
+    for ob in objsR: bpy.context.scene.collection.objects.link(ob)
+    bpy.context.view_layer.update()
+    kidsR=[ob for ob in objsR if ob.type=='MESH']
+    for i,ob in enumerate(kidsR):
+        M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
+        bpy.context.view_layer.objects.active=ob; ob.select_set(True)
+        bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+        bm=bmesh.new(); bm.from_mesh(ob.data)
+        bmesh.ops.dissolve_limit(bm,angle_limit=math.radians(0.6),verts=bm.verts,edges=bm.edges,delimit={'MATERIAL'})
+        bmesh.ops.triangulate(bm,faces=bm.faces); bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    allR=sum(len(k_.data.polygons) for k_ in kidsR); ratioR=min(1.0,float(os.environ.get('REAR_TARGET','45000'))/allR); print('cangkang belakang face',allR,'rasio',round(ratioR,3))
+    mtR=bpy.data.materials.new('hitam_belakang'); mtR.use_nodes=True; nt=mtR.node_tree; nt.nodes.clear()
+    out_=nt.nodes.new('ShaderNodeOutputMaterial'); bs_=nt.nodes.new('ShaderNodeBsdfPrincipled'); bs_.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs_.inputs['Roughness'].default_value=0.5; bs_.inputs['Metallic'].default_value=0.0
+    nt.links.new(bs_.outputs['BSDF'],out_.inputs['Surface'])
+    for i,ob in enumerate(kidsR):
+        bpy.context.view_layer.objects.active=ob
+        if ratioR<1 and len(ob.data.polygons)>1500:
+            md=ob.modifiers.new('dec','DECIMATE'); md.ratio=ratioR; md.delimit={'NORMAL','MATERIAL'}; md.angle_limit=math.radians(25); bpy.ops.object.modifier_apply(modifier='dec')
+        me_=ob.data
+        for pl in me_.polygons: pl.use_smooth=True
+        me_.materials.clear(); me_.materials.append(mtR)
+        ob.name='Sandaran_Belakang_Kiri_%02d'%i
+    DXR=float(os.environ.get('LEVER_DX','0.827'))
+    for ob in list(kidsR):
+        d=ob.copy(); d.data=ob.data.copy(); d.name=ob.name.replace('Kiri','Kanan'); bpy.context.scene.collection.objects.link(d)
+        d.data.transform(mathutils.Matrix.Translation((DXR,0,0)))
+    for ob in objsR:
+        if ob.type=='EMPTY': bpy.data.objects.remove(ob)
+    print('cangkang belakang ditambahkan, total face',sum(len(k_.data.polygons) for k_ in kidsR)*2)
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)
