@@ -170,13 +170,6 @@ if PN:
         print('bagian',nm,len(nm_.polygons))
     bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
     seam=[e for e in bm.edges if len(e.link_faces)>=2 and any(part[f.index]==0 for f in e.link_faces) and any(part[f.index]!=0 for f in e.link_faces)]
-    fill_pts=[]
-    if HB:   # sisi badan bekas handrest kiri berantakan/kopong: buang isinya, ganti blok padat hitam yang menyatu dengan badan
-        BX=eval(os.environ.get('FILL_BOX','(-0.90,-0.64,-0.14,0.38,-0.54,-0.30)'))
-        inbox=lambda f: BX[0]<=f.calc_center_median().x<=BX[1] and BX[2]<=f.calc_center_median().y<=BX[3] and BX[4]<=f.calc_center_median().z<=BX[5]
-        rem=[f for f in bm.faces if part[f.index]==0 and inbox(f)]
-        fill_pts=[tuple(v.co) for f in rem for v in f.verts]; print('isi padat: face dibuang',len(rem))
-        for f in rem: part[f.index]=99
     bmesh.ops.delete(bm,geom=[f for f in bm.faces if part[f.index]!=0],context='FACES')
     bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
     # tutup lubang bekas bagian yang dilepas (bagian dalam badan jadi tidak terlihat bolong)
@@ -189,21 +182,6 @@ if PN:
     for f in capf: f.material_index=3; f.smooth=True
     print('tutup lubang: sisi',len(seam),'face penutup',len(capf))
     bm.to_mesh(me); bm.free()
-if HB and 'fill_pts' in globals() and fill_pts:
-    hb=bmesh.new()
-    for q in fill_pts: hb.verts.new(q)
-    bmesh.ops.convex_hull(hb,input=hb.verts,use_existing_faces=False)
-    bmesh.ops.delete(hb,geom=[v for v in hb.verts if not v.link_faces],context='VERTS')
-    hm=bpy.data.meshes.new('IsiPadat'); hb.to_mesh(hm); hb.free()
-    bk=bpy.data.materials.new('isi_hitam'); bk.use_nodes=True; bkb=bk.node_tree.nodes['Principled BSDF']; bkb.inputs['Base Color'].default_value=(0.03,0.03,0.033,1); bkb.inputs['Roughness'].default_value=0.6
-    hm.materials.append(bk)
-    for pl in hm.polygons: pl.use_smooth=True
-    ho=bpy.data.objects.new('Isi_Padat',hm); bpy.context.scene.collection.objects.link(ho)
-    bpy.context.view_layer.objects.active=ho; ho.select_set(True)
-    bv=ho.modifiers.new('bv','BEVEL'); bv.width=0.05; bv.segments=6; bv.limit_method='NONE'; bpy.ops.object.modifier_apply(modifier='bv')   # bulatkan sudut blok
-    sd=ho.modifiers.new('sd','SUBSURF'); sd.levels=2; sd.render_levels=2; bpy.ops.object.modifier_apply(modifier='sd')
-    for pl in hm.polygons: pl.use_smooth=True
-    print('isi padat face',len(hm.polygons))
 if HB:   # handrest kiri baru dari rakitan di blend pengguna (nama Handrest_Kiri_NN supaya animasi lepas/pasang di web tetap jalan)
     RATIO=float(os.environ.get('HAND_RATIO','0.12'))
     with bpy.data.libraries.load(HB) as (d0,d1): d1.objects=[n for n in d0.objects if n=='Assem--KAKI BANGKU SUZUKI' or n.startswith(('(OPSI','AS ROTOR','BESI AR','HOUSING','KARET','KEPALA SAFETY','PART','PUSH BOTTOM','ROTOR'))]
