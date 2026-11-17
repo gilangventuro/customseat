@@ -620,7 +620,7 @@ if REAR or REAR_IN:
                 BR=int(os.environ.get('SMOOTH_RINGS','32')); NI=int(os.environ.get('SMOOTH_ITERS','300')); DNEAR=float(os.environ.get('SMOOTH_DNEAR','0.05'))
                 bm.verts.ensure_lookup_table()
                 if os.environ.get('REAR_FILL','1')=='1':   # tutup lubang-lubang kecil (robekan scan) di dekat cangkang
-                    FM=int(os.environ.get('FILL_MAX','160')); seen=set(); nfill=0
+                    FM=int(os.environ.get('FILL_MAX','450')); seen=set(); nfill=0
                     for e0 in [e for e in bm.edges if e.is_boundary]:
                         if e0 in seen: continue
                         st=[e0]; c=[]; seen.add(e0)
@@ -629,7 +629,7 @@ if REAR or REAR_IN:
                             for v in x.verts:
                                 for e2 in v.link_edges:
                                     if e2.is_boundary and e2 not in seen: seen.add(e2); st.append(e2)
-                        if len(c)>FM or not any(v.index in T for x in c for v in x.verts): continue
+                        if len(c)>FM: continue
                         try: nf=bmesh.ops.holes_fill(bm,edges=c,sides=FM+5)['faces']
                         except Exception as ex_: print('fill gagal',ex_); continue
                         for f in nf:
