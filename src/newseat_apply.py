@@ -177,6 +177,8 @@ if os.environ.get('HOLE_FIX','1')=='1':
             if len(_ring)<8: print('tambal: ring kosong',_oo,_cy,_cz); continue
             _xr=_W[_ring,0]*_oo; _rg=_ring[_xr>_xr.max()-0.015]
             if len(_rg)<8: print('tambal: ring sempit',_oo,_cy,_cz); continue
+            _rg=np.array([i for i in _rg if len(bm.verts[int(i)].link_loops)],dtype=_rg.dtype)
+            if len(_rg)<8: print('tambal: ring sempit(loop)',_oo,_cy,_cz); continue
             _u=(_W[_rg,1]-_cy)/_R; _v=(_W[_rg,2]-_cz)/_R
             _bs=lambda u,v: np.stack([np.ones_like(u),u,v,u*u,u*v,v*v],1)
             _co,*_=np.linalg.lstsq(_bs(_u,_v),_W[_rg,0],rcond=None)
@@ -234,7 +236,8 @@ if DN:
     _sel&=(part==0); part[_sel]=9; print('buang wajah sesuai blend baru',int(_sel.sum()))
 TH=os.environ.get('THREAD_NPZ')
 HB=os.environ.get('HAND_BLEND')   # blend berisi handrest kiri baru (rakitan beberapa objek) pengganti Handrest_Kiri
-REAR=HB and os.environ.get('REAR_NEW','0')=='1'
+REAR_IN=bool(HB) and os.environ.get('REAR_INPLACE','0')=='1'   # cangkang kedua jok sudah ada di blend pengguna: pakai apa adanya
+REAR=HB and os.environ.get('REAR_NEW','0')=='1' and not REAR_IN
 if REAR and PN:   # area merah (label 3 = 4_TidakBisaDiganti) di belakang sandaran dibuang, diganti cangkang belakang baru
     _M=np.array(o.matrix_world); _nv=len(me.vertices); _P=np.empty(_nv*3); me.vertices.foreach_get('co',_P); _P=_P.reshape(-1,3); _W=_P@_M[:3,:3].T+_M[:3,3]
     _li=np.empty(len(me.loops),np.int32); me.loops.foreach_get('vertex_index',_li); _ls=np.empty(len(me.polygons),np.int32); me.polygons.foreach_get('loop_start',_ls); _lt=np.empty(len(me.polygons),np.int32); me.polygons.foreach_get('loop_total',_lt)
@@ -301,7 +304,7 @@ for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem
         if 'ALLOBJ' not in globals():
             with bpy.data.libraries.load(HB) as (d0,d1_): d1_.objects=[n for n in d0.objects if n not in ('Kursi','Kursi MESH','Mesh_0.001')]
             ALLOBJ=[o for o in d1_.objects if o]
-            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2','Assem1--OPSI 3','Assem-FRAME GAS SPRING (800N)','Assem--FRAME KAKI')}
+            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2','Assem1--OPSI 3','Assem-FRAME GAS SPRING (800N)','Assem-FRAME GAS SPRING (800N).001','Assem--FRAME KAKI')}
         class _S: pass
         d1=_S(); d1.objects=SELS[ASM]
         for ob in d1.objects: bpy.context.scene.collection.objects.link(ob)
@@ -379,6 +382,40 @@ if HB and os.environ.get('FRAME_KAKI','1')=='1' and 'SELS' in globals():   # ran
     for ob in objsK:
         if ob.type=='EMPTY': bpy.data.objects.remove(ob)
     print('rangka kaki',nk)
+if REAR_IN:
+    import bmesh, mathutils
+    mtR=bpy.data.materials.new('hitam_belakang'); mtR.use_nodes=True; nt=mtR.node_tree; nt.nodes.clear()
+    out_=nt.nodes.new('ShaderNodeOutputMaterial'); bs_=nt.nodes.new('ShaderNodeBsdfPrincipled'); bs_.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs_.inputs['Roughness'].default_value=0.5; bs_.inputs['Metallic'].default_value=0.0
+    nt.links.new(bs_.outputs['BSDF'],out_.inputs['Surface'])
+    shells=[]
+    for ASMR,SIDE in (('Assem-FRAME GAS SPRING (800N).001','Kiri'),('Assem-FRAME GAS SPRING (800N)','Kanan')):
+        objsR=SELS[ASMR]
+        for ob in objsR: bpy.context.scene.collection.objects.link(ob)
+        bpy.context.view_layer.update()
+        ks=[ob for ob in objsR if ob.type=='MESH']
+        for ob in ks:
+            M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
+            bpy.context.view_layer.objects.active=ob; ob.select_set(True)
+            if ob.data.users>1: ob.data=ob.data.copy()
+            bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+            ob.data.transform(mathutils.Matrix.Translation((float(os.environ.get('HB_DX','0')),0,0)))
+            bm=bmesh.new(); bm.from_mesh(ob.data)
+            bmesh.ops.dissolve_limit(bm,angle_limit=math.radians(0.6),verts=bm.verts,edges=bm.edges,delimit={'MATERIAL'})
+            bmesh.ops.triangulate(bm,faces=bm.faces); bm.to_mesh(ob.data); bm.free(); ob.data.update()
+        shells.append((SIDE,ks))
+        for ob in objsR:
+            if ob.type=='EMPTY': bpy.data.objects.remove(ob)
+    allR=sum(len(k_.data.polygons) for _,ks in shells for k_ in ks); ratioR=min(1.0,float(os.environ.get('REAR_TARGET','90000'))/allR); print('cangkang belakang (blend) face',allR,'rasio',round(ratioR,3))
+    for SIDE,ks in shells:
+        for i,ob in enumerate(ks):
+            bpy.context.view_layer.objects.active=ob
+            if ratioR<1 and len(ob.data.polygons)>1500:
+                md=ob.modifiers.new('dec','DECIMATE'); md.ratio=ratioR; md.delimit={'NORMAL','MATERIAL'}; md.angle_limit=math.radians(25); bpy.ops.object.modifier_apply(modifier='dec')
+            me_=ob.data
+            for pl in me_.polygons: pl.use_smooth=True
+            me_.materials.clear(); me_.materials.append(mtR)
+            ob.name='Sandaran_Belakang_%s_%02d'%(SIDE,i)
+    print('cangkang belakang total face',sum(len(k_.data.polygons) for _,ks in shells for k_ in ks))
 if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk kedua jok: kiri = aslinya, kanan = salinan digeser (jok identik, tanpa cermin)
     import bmesh, mathutils
     ASMR='Assem-FRAME GAS SPRING (800N)'
