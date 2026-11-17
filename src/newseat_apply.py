@@ -583,7 +583,7 @@ if REAR or REAR_IN:
                 h=tr.find_nearest(MWb@v.co); near[v.index]=None if h[0] is None else (h[0],h[3])
             return near[v.index]
         if os.environ.get('REAR_SNAP','1')=='1':   # tarik tepi badan agar menempel ke kurva halus di tepi cangkang (pudar ke dalam beberapa ring)
-            KR=int(os.environ.get('SNAP_RINGS','7')); SM=int(os.environ.get('SNAP_SMOOTH','14'))
+            KR=int(os.environ.get('SNAP_RINGS','7')); SM=int(os.environ.get('SNAP_SMOOTH','40'))
             T={}; nb={}
             for e in bm.edges:
                 if not e.is_boundary: continue
@@ -615,6 +615,58 @@ if REAR or REAR_IN:
             R3=MWbi.to_3x3()
             for vi,r_ in ring.items():
                 s_=1-r_/(KR+1); w_=s_*s_*(3-2*s_); bm.verts[vi].co+=R3@(raw[vi]*w_)
+            if os.environ.get('REAR_SMOOTH','1')=='1':   # haluskan pita kulit di sepanjang tepi cangkang (kerutan & pecahan segitiga scan), tepi dikunci
+                import numpy as np
+                BR=int(os.environ.get('SMOOTH_RINGS','32')); NI=int(os.environ.get('SMOOTH_ITERS','300')); DNEAR=float(os.environ.get('SMOOTH_DNEAR','0.05'))
+                bm.verts.ensure_lookup_table()
+                if os.environ.get('REAR_FILL','1')=='1':   # tutup lubang-lubang kecil (robekan scan) di dekat cangkang
+                    FM=int(os.environ.get('FILL_MAX','160')); seen=set(); nfill=0
+                    for e0 in [e for e in bm.edges if e.is_boundary]:
+                        if e0 in seen: continue
+                        st=[e0]; c=[]; seen.add(e0)
+                        while st:
+                            x=st.pop(); c.append(x)
+                            for v in x.verts:
+                                for e2 in v.link_edges:
+                                    if e2.is_boundary and e2 not in seen: seen.add(e2); st.append(e2)
+                        if len(c)>FM or not any(v.index in T for x in c for v in x.verts): continue
+                        try: nf=bmesh.ops.holes_fill(bm,edges=c,sides=FM+5)['faces']
+                        except Exception as ex_: print('fill gagal',ex_); continue
+                        for f in nf:
+                            f.smooth=True
+                            for l in f.loops:
+                                for l2 in l.vert.link_loops:
+                                    if l2.face not in nf: l[uvl].uv=l2[uvl].uv; break
+                        bmesh.ops.triangulate(bm,faces=nf); nfill+=1
+                    print('lubang ditutup',nfill)
+                    bm.verts.ensure_lookup_table(); bm.edges.ensure_lookup_table()
+                rb={vi:0 for vi in T}; front=list(T.keys())
+                for r_ in range(1,BR+1):
+                    nxt=[]
+                    for vi in front:
+                        vv=bm.verts[vi]
+                        for e in vv.link_edges:
+                            wi=e.other_vert(vv).index
+                            if wi in rb: continue
+                            rb[wi]=r_; nxt.append(wi)
+                    front=nxt
+                nV=len(bm.verts); P=np.array([(v.co.x,v.co.y,v.co.z) for v in bm.verts]); W=np.zeros(nV)
+                for vi,r_ in rb.items():
+                    if r_>0: W[vi]=1.0 if r_<=BR-6 else (BR-r_)/6.0
+                for v in bm.verts:   # vertex dekat permukaan cangkang ikut dihaluskan
+                    h=tr.find_nearest(MWb@v.co)
+                    if h[0] is not None and h[3]<DNEAR: W[v.index]=1.0
+                for vi in T: W[vi]=0   # hanya tepi yang menempel ke cangkang dikunci; robekan scan lain ikut dihaluskan
+                for e in bm.edges:
+                    if e.is_boundary and rb.get(e.verts[0].index,99)>BR and rb.get(e.verts[1].index,99)>BR and W[e.verts[0].index]<1: W[e.verts[0].index]=0; W[e.verts[1].index]=0
+                ed=np.array([(e.verts[0].index,e.verts[1].index) for e in bm.edges]); deg=np.bincount(np.r_[ed[:,0],ed[:,1]],minlength=nV).astype(float); deg[deg==0]=1
+                for _ in range(NI):
+                    for lam in (0.5,-0.53):
+                        S=np.zeros_like(P)
+                        for k in range(3): S[:,k]=np.bincount(ed[:,0],weights=P[ed[:,1],k],minlength=nV)+np.bincount(ed[:,1],weights=P[ed[:,0],k],minlength=nV)
+                        P+=lam*W[:,None]*(S/deg[:,None]-P)
+                for vi in np.nonzero(W>0)[0]: bm.verts[int(vi)].co=mathutils.Vector(P[vi])
+                print('pita kulit dihaluskan',int((W>0).sum()),'vert')
             bm.to_mesh(me); me.update(); near.clear(); DMIN=max(DMIN,float(os.environ.get('SKIRT_DMIN2','0.004')))
             print('tepi badan ditarik ke cangkang',len(T),'vert tepi')
         ne=0; pv={}; bv={}; b2=bmesh.new()
@@ -623,7 +675,7 @@ if REAR or REAR_IN:
             return bv[v.index]
         for e in [e for e in bm.edges if e.is_boundary]:
             r=[nr(v) for v in e.verts]
-            if None in r or any(d>DMAX for _,d in r) or all(d<DMIN for _,d in r): continue
+            if None in r or any(d>float(os.environ.get('SKIRT_RMAX','0.02')) for _,d in r) or all(d<DMIN for _,d in r): continue
             l=e.link_loops[0]; a=l.vert; b=l.link_loop_next.vert
             def pnt(v):
                 if v.index not in pv: pv[v.index]=b2.verts.new(nr(v)[0])
