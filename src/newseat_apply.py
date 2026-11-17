@@ -31,7 +31,7 @@ if RED:
 me=o.data
 # Haluskan permukaan atas sandaran (kerutan/duri hasil Meshy). Taubin (lambda|mu) supaya tidak menyusut; hanya z>ZLO (jahitan semuanya di bawah z=0.6)
 if os.environ.get('HR_SMOOTH','1')=='1':
-    ZLO=float(os.environ.get('HR_ZLO','0.60')); ZHI=float(os.environ.get('HR_ZHI','0.67')); IT=int(os.environ.get('HR_IT','80'))
+    ZLO=float(os.environ.get('HR_ZLO','0.60')); ZHI=float(os.environ.get('HR_ZHI','0.67')); IT=int(os.environ.get('HR_IT','200'))
     nv=len(me.vertices); P=np.empty(nv*3,np.float64); me.vertices.foreach_get('co',P); P=P.reshape(-1,3)
     ed=np.empty(len(me.edges)*2,np.int32); me.edges.foreach_get('vertices',ed); ed=ed.reshape(-1,2)
     # titik kembar (posisi sama, terputus di jahitan/UV) disatukan dulu supaya celah retak ikut tertutup
@@ -56,7 +56,7 @@ if os.environ.get('HR_SMOOTH','1')=='1':
     for c in range(3): Nrm[:,c]=np.bincount(uid,weights=vn0[:,c],minlength=nu)/cnt
     for _ in range(20): Nrm=Nrm+0.5*lap(Nrm)
     Nrm/=np.maximum(np.linalg.norm(Nrm,axis=1,keepdims=True),1e-9)
-    for _ in range(int(os.environ.get('HR_IT2','250'))):
+    for _ in range(int(os.environ.get('HR_IT2','700'))):
         L=lap(U); bk=np.clip((Nrm[:,1]-0.35)/0.3,0,1)[:,None]   # hanya permukaan belakang (normal +y): sudut sandaran tidak ikut menyusut
         U=U+0.8*wu*bk*(L*Nrm).sum(1,keepdims=True)*Nrm
     P=P+(U[uid]-np.array([np.bincount(uid,weights=P[:,c],minlength=nu)/cnt for c in range(3)]).T[uid])*(w>0)
@@ -583,7 +583,7 @@ if REAR or REAR_IN:
                 h=tr.find_nearest(MWb@v.co); near[v.index]=None if h[0] is None else (h[0],h[3])
             return near[v.index]
         if os.environ.get('REAR_SNAP','1')=='1':   # tarik tepi badan agar menempel ke kurva halus di tepi cangkang (pudar ke dalam beberapa ring)
-            KR=int(os.environ.get('SNAP_RINGS','7')); SM=int(os.environ.get('SNAP_SMOOTH','40'))
+            KR=int(os.environ.get('SNAP_RINGS','12')); SM=int(os.environ.get('SNAP_SMOOTH','120'))
             T={}; nb={}
             for e in bm.edges:
                 if not e.is_boundary: continue
@@ -617,7 +617,7 @@ if REAR or REAR_IN:
                 s_=1-r_/(KR+1); w_=s_*s_*(3-2*s_); bm.verts[vi].co+=R3@(raw[vi]*w_)
             if os.environ.get('REAR_SMOOTH','1')=='1':   # haluskan pita kulit di sepanjang tepi cangkang (kerutan & pecahan segitiga scan), tepi dikunci
                 import numpy as np
-                BR=int(os.environ.get('SMOOTH_RINGS','32')); NI=int(os.environ.get('SMOOTH_ITERS','300')); DNEAR=float(os.environ.get('SMOOTH_DNEAR','0.05'))
+                BR=int(os.environ.get('SMOOTH_RINGS','44')); NI=int(os.environ.get('SMOOTH_ITERS','400')); DNEAR=float(os.environ.get('SMOOTH_DNEAR','0.05'))
                 bm.verts.ensure_lookup_table()
                 if os.environ.get('REAR_FILL','1')=='1':   # tutup lubang-lubang kecil (robekan scan) di dekat cangkang
                     FM=int(os.environ.get('FILL_MAX','450')); seen=set(); nfill=0
