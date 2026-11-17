@@ -574,7 +574,7 @@ if REAR or REAR_IN:
         sv=[];sp=[]
         for so in SO:
             mw=so.matrix_world; b0=len(sv); sv+= [mw@v.co for v in so.data.vertices]; sp+= [tuple(b0+i for i in p_.vertices) for p_ in so.data.polygons]
-        tr=BVHTree.FromPolygons(sv,sp); DMAX=float(os.environ.get('SKIRT_DMAX','0.08')); DMIN=float(os.environ.get('SKIRT_DMIN','0.0015'))
+        tr=BVHTree.FromPolygons(sv,sp); DMAX=float(os.environ.get('SKIRT_DMAX','0.14')); DMIN=float(os.environ.get('SKIRT_DMIN','0.0015'))
         MWb=o.matrix_world; MWbi=MWb.inverted()
         bm=bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table(); uvl=bm.loops.layers.uv.active
         near={}
