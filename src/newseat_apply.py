@@ -228,6 +228,10 @@ PN=os.environ.get('PART_NPY'); NAMES={1:'Handrest_Kanan',2:'Handrest_Kiri',3:'Fo
 part=np.zeros(len(me.polygons),np.int8)
 if PN:
     pp=np.load(PN); m_=min(len(pp),len(part)); part[:m_]=pp[:m_]
+DN=os.environ.get('DROP_NPY')   # wajah badan yang sudah dibuang pengguna di blend baru (rangka bawah dsb.) ikut dibuang
+if DN:
+    _dm=np.load(DN).astype(bool)[:len(part)]; _sel=np.zeros(len(part),bool); _sel[:len(_dm)]=_dm
+    _sel&=(part==0); part[_sel]=9; print('buang wajah sesuai blend baru',int(_sel.sum()))
 TH=os.environ.get('THREAD_NPZ')
 HB=os.environ.get('HAND_BLEND')   # blend berisi handrest kiri baru (rakitan beberapa objek) pengganti Handrest_Kiri
 REAR=HB and os.environ.get('REAR_NEW','0')=='1'
@@ -239,11 +243,12 @@ if REAR and PN:   # area merah (label 3 = 4_TidakBisaDiganti) di belakang sandar
         _m=_lt>_k; _c[_m]+=_W[_li[_ls[_m]+_k]]
     _c/=_lt[:,None]
     DXR=float(os.environ.get('LEVER_DX','0.827')); X0=float(os.environ.get('REAR_X0','-0.84')); X1=float(os.environ.get('REAR_X1','0.03')); Z0=float(os.environ.get('REAR_Z0','-0.37')); Z1=float(os.environ.get('REAR_Z1','0.62')); Y0=float(os.environ.get('REAR_Y0','0.15'))
+    MXR=float(os.environ.get('REAR_MX','0.0'))   # sisakan pinggir (dinding samping) supaya tidak bolong di samping cangkang
     _rm=np.zeros(len(me.polygons),bool)
     for _dx in (0.0,DXR):
-        _rm|=(lab[:len(_c)]==3)&(_c[:,0]>X0+_dx)&(_c[:,0]<X1+_dx)&(_c[:,2]>Z0)&(_c[:,2]<Z1)&(_c[:,1]>Y0)&(part==0)
+        _rm|=(lab[:len(_c)]==3)&(_c[:,0]>X0+_dx+MXR)&(_c[:,0]<X1+_dx-MXR)&(_c[:,2]>Z0)&(_c[:,2]<Z1)&(_c[:,1]>Y0)&(part==0)
     part[_rm]=9; print('area merah belakang dibuang',int(_rm.sum()),'face')
-    RC=_c[_rm&(_c[:,0]<X1)&(_c[:,0]>X0)]   # pusat face area merah jok kiri (untuk menempelkan cangkang baru)
+    RC=_c[_rm&(_c[:,0]<X1-MXR)&(_c[:,0]>X0+MXR)]   # pusat face area merah jok kiri (untuk menempelkan cangkang baru)
 sm=None
 if TH:
     sm=bpy.data.materials.new('leather_stitch'); sm.use_nodes=True
@@ -302,6 +307,7 @@ for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem
             M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
             bpy.context.view_layer.objects.active=ob; ob.select_set(True)
             bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+            ob.data.transform(mathutils.Matrix.Translation((float(os.environ.get('HB_DX','0')),0,0)))   # blend baru bergeser global (kerangka Kursi di x=-2.522)
             if SIDE=='Kiri': ob.data.transform(mathutils.Matrix.Translation((0,0,float(os.environ.get('HAND_DZ_KIRI','-0.03')))))   # setarakan tinggi dengan handrest kanan
             n0=len(ob.data.polygons)
             # rapikan: gabung bidang rata (CAD) dulu tanpa kehilangan bentuk, baru kurangi sisanya
@@ -498,6 +504,36 @@ if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk k
             if ob.type=='EMPTY': bpy.data.objects.remove(ob)
         except ReferenceError: pass
     print('cangkang belakang ditambahkan, total face',sum(len(k_.data.polygons) for k_ in kidsR)*2)
+    # tutup celah di samping/sekeliling cangkang: tepi terbuka badan yang dekat cangkang disambung ke permukaan cangkang terdekat dengan pita halus (badan & cangkang menyatu)
+    if os.environ.get('REAR_SKIRT','1')=='1':
+        from mathutils.bvhtree import BVHTree
+        SO=[x for x in bpy.data.objects if x.name.startswith('Sandaran_Belakang_')]
+        sv=[];sp=[]
+        for so in SO:
+            mw=so.matrix_world; b0=len(sv); sv+= [mw@v.co for v in so.data.vertices]; sp+= [tuple(b0+i for i in p_.vertices) for p_ in so.data.polygons]
+        tr=BVHTree.FromPolygons(sv,sp); DMAX=float(os.environ.get('SKIRT_DMAX','0.08')); DMIN=float(os.environ.get('SKIRT_DMIN','0.0015'))
+        MWb=o.matrix_world; MWbi=MWb.inverted()
+        bm=bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table(); uvl=bm.loops.layers.uv.active
+        near={}
+        def nr(v):
+            if v.index not in near:
+                h=tr.find_nearest(MWb@v.co); near[v.index]=None if h[0] is None else (h[0],h[3])
+            return near[v.index]
+        ne=0; pv={}; newf=[]
+        for e in [e for e in bm.edges if e.is_boundary]:
+            r=[nr(v) for v in e.verts]
+            if None in r or any(d>DMAX for _,d in r) or all(d<DMIN for _,d in r): continue
+            l=e.link_loops[0]; a=l.vert; b=l.link_loop_next.vert
+            def pnt(v):
+                if v.index not in pv:
+                    p=nr(v)[0]; pv[v.index]=(bm.verts.new(MWbi@p), v.link_loops[0][uvl].uv.copy())
+                return pv[v.index]
+            pa,ua=pnt(a); pb,ub=pnt(b)
+            try: f=bm.faces.new((b,a,pa,pb))
+            except ValueError: continue
+            f.material_index=3; f.smooth=True; ne+=1; newf.append(f)
+            for lp in f.loops: lp[uvl].uv=(ua if lp.vert in (a,pa) else ub)
+        bm.to_mesh(me); bm.free(); me.update(); print('pita penutup celah cangkang',ne)
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)
