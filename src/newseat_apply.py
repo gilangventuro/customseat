@@ -230,7 +230,7 @@ if PN:
     pp=np.load(PN); m_=min(len(pp),len(part)); part[:m_]=pp[:m_]
 TH=os.environ.get('THREAD_NPZ')
 HB=os.environ.get('HAND_BLEND')   # blend berisi handrest kiri baru (rakitan beberapa objek) pengganti Handrest_Kiri
-REAR=HB and os.environ.get('REAR_NEW','1')=='1'
+REAR=HB and os.environ.get('REAR_NEW','0')=='1'
 if REAR and PN:   # area merah (label 3 = 4_TidakBisaDiganti) di belakang sandaran dibuang, diganti cangkang belakang baru
     _M=np.array(o.matrix_world); _nv=len(me.vertices); _P=np.empty(_nv*3); me.vertices.foreach_get('co',_P); _P=_P.reshape(-1,3); _W=_P@_M[:3,:3].T+_M[:3,3]
     _li=np.empty(len(me.loops),np.int32); me.loops.foreach_get('vertex_index',_li); _ls=np.empty(len(me.polygons),np.int32); me.polygons.foreach_get('loop_start',_ls); _lt=np.empty(len(me.polygons),np.int32); me.polygons.foreach_get('loop_total',_lt)
