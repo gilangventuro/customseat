@@ -564,6 +564,8 @@ if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk k
             if ob.type=='EMPTY': bpy.data.objects.remove(ob)
         except ReferenceError: pass
     print('cangkang belakang ditambahkan, total face',sum(len(k_.data.polygons) for k_ in kidsR)*2)
+if REAR or REAR_IN:
+    import bmesh, mathutils
     # tutup celah di samping/sekeliling cangkang: tepi terbuka badan yang dekat cangkang disambung ke permukaan cangkang terdekat dengan pita halus (badan & cangkang menyatu)
     if os.environ.get('REAR_SKIRT','1')=='1':
         from mathutils.bvhtree import BVHTree
@@ -579,21 +581,25 @@ if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk k
             if v.index not in near:
                 h=tr.find_nearest(MWb@v.co); near[v.index]=None if h[0] is None else (h[0],h[3])
             return near[v.index]
-        ne=0; pv={}; newf=[]
+        ne=0; pv={}; bv={}; b2=bmesh.new()
+        def bvx(v):
+            if v.index not in bv: bv[v.index]=b2.verts.new(MWb@v.co)
+            return bv[v.index]
         for e in [e for e in bm.edges if e.is_boundary]:
             r=[nr(v) for v in e.verts]
             if None in r or any(d>DMAX for _,d in r) or all(d<DMIN for _,d in r): continue
             l=e.link_loops[0]; a=l.vert; b=l.link_loop_next.vert
             def pnt(v):
-                if v.index not in pv:
-                    p=nr(v)[0]; pv[v.index]=(bm.verts.new(MWbi@p), v.link_loops[0][uvl].uv.copy())
+                if v.index not in pv: pv[v.index]=b2.verts.new(nr(v)[0])
                 return pv[v.index]
-            pa,ua=pnt(a); pb,ub=pnt(b)
-            try: f=bm.faces.new((b,a,pa,pb))
+            try: b2.faces.new((bvx(b),bvx(a),pnt(a),pnt(b))).smooth=True; ne+=1
             except ValueError: continue
-            f.material_index=3; f.smooth=True; ne+=1; newf.append(f)
-            for lp in f.loops: lp[uvl].uv=(ua if lp.vert in (a,pa) else ub)
-        bm.to_mesh(me); bm.free(); me.update(); print('pita penutup celah cangkang',ne)
+        bm.free()
+        if ne:
+            mp_=bpy.data.meshes.new('PitaCelah'); b2.to_mesh(mp_); mp_.materials.append(mtR if 'mtR' in globals() else bpy.data.materials.get('hitam_belakang'))
+            for pl in mp_.polygons: pl.use_smooth=True
+            po=bpy.data.objects.new('Sandaran_Belakang_Pita',mp_); bpy.context.scene.collection.objects.link(po)
+        b2.free(); print('pita penutup celah cangkang',ne)
 bpy.ops.export_scene.gltf(filepath=OUT,export_format='GLB',export_draco_mesh_compression_enable=True,
     export_draco_mesh_compression_level=6,export_materials='EXPORT',export_image_format='AUTO')
 print('done',OUT,os.path.getsize(OUT)/1e6)
