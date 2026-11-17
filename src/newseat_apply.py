@@ -247,6 +247,12 @@ if REAR and PN:   # area merah (label 3 = 4_TidakBisaDiganti) di belakang sandar
     _rm=np.zeros(len(me.polygons),bool)
     for _dx in (0.0,DXR):
         _rm|=(lab[:len(_c)]==3)&(_c[:,0]>X0+_dx+MXR)&(_c[:,0]<X1+_dx-MXR)&(_c[:,2]>Z0)&(_c[:,2]<Z1)&(_c[:,1]>Y0)&(part==0)
+    if os.environ.get('REAR_EXCL_NPY'):   # wajah yang bukan bagian cangkang (rangka dll. di blend pengguna) jangan ikut dibuang
+        _ex=np.zeros(len(_rm),bool); _e0=np.load(os.environ['REAR_EXCL_NPY']).astype(bool)[:len(_rm)]; _ex[:len(_e0)]=_e0
+        _rm0=_rm.copy(); _rm[:]=False
+        for _dx in (0.0,DXR):   # di area punggung: buang semua wajah yang sudah dibuang pengguna + area merah; di luar area (rangka) dipertahankan
+            _bx=(_c[:,0]>X0+_dx+MXR)&(_c[:,0]<X1+_dx-MXR)&(_c[:,2]>Z0)&(_c[:,2]<Z1)&(_c[:,1]>Y0)&(part==0)
+            _rm|=_bx&(_ex|(lab[:len(_c)]==3))
     part[_rm]=9; print('area merah belakang dibuang',int(_rm.sum()),'face')
     RC=_c[_rm&(_c[:,0]<X1-MXR)&(_c[:,0]>X0+MXR)]   # pusat face area merah jok kiri (untuk menempelkan cangkang baru)
 sm=None
@@ -295,7 +301,7 @@ for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem
         if 'ALLOBJ' not in globals():
             with bpy.data.libraries.load(HB) as (d0,d1_): d1_.objects=[n for n in d0.objects if n not in ('Kursi','Kursi MESH','Mesh_0.001')]
             ALLOBJ=[o for o in d1_.objects if o]
-            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2','Assem1--OPSI 3','Assem-FRAME GAS SPRING (800N)')}
+            SELS={a:[o for o in ALLOBJ if o.name==a or (o.parent and o.parent.name==a)] for a in ('Assem--KAKI BANGKU SUZUKI','Assem2','Assem1--OPSI 3','Assem-FRAME GAS SPRING (800N)','Assem--FRAME KAKI')}
         class _S: pass
         d1=_S(); d1.objects=SELS[ASM]
         for ob in d1.objects: bpy.context.scene.collection.objects.link(ob)
@@ -356,6 +362,23 @@ for SIDE,ASM,K,SGN in [("Kiri","Assem--KAKI BANGKU SUZUKI",2,-1),("Kanan","Assem
                 mt=bpy.data.materials.new('isi_hitam'); mt.use_nodes=True; bs=mt.node_tree.nodes.get('Principled BSDF')
                 bs.inputs['Base Color'].default_value=(0.025,0.025,0.028,1); bs.inputs['Roughness'].default_value=0.5
                 hm.materials.append(mt); print('isi rumah handrest',SIDE,hs.name,len(hm.polygons),'x',round(mx,3),'->',XB)
+if HB and os.environ.get('FRAME_KAKI','1')=='1' and 'SELS' in globals():   # rangka kaki dari blend pengguna (kaki/palang di bawah kursi)
+    import mathutils
+    objsK=SELS['Assem--FRAME KAKI']
+    for ob in objsK: bpy.context.scene.collection.objects.link(ob)
+    bpy.context.view_layer.update()
+    nk=0
+    for ob in [x for x in objsK if x.type=='MESH']:
+        M=ob.matrix_world.copy(); ob.parent=None; ob.matrix_world=M
+        bpy.context.view_layer.objects.active=ob; ob.select_set(True)
+        if ob.data.users>1: ob.data=ob.data.copy()
+        bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+        ob.data.transform(mathutils.Matrix.Translation((float(os.environ.get('HB_DX','0')),0,0)))
+        for pl in ob.data.polygons: pl.use_smooth=True
+        ob.name='Rangka_Kaki_%02d'%nk; nk+=1
+    for ob in objsK:
+        if ob.type=='EMPTY': bpy.data.objects.remove(ob)
+    print('rangka kaki',nk)
 if REAR:   # cangkang belakang sandaran baru (rakitan di blend pengguna) untuk kedua jok: kiri = aslinya, kanan = salinan digeser (jok identik, tanpa cermin)
     import bmesh, mathutils
     ASMR='Assem-FRAME GAS SPRING (800N)'
