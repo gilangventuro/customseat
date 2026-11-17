@@ -398,7 +398,8 @@ if REAR_IN:
             bpy.context.view_layer.objects.active=ob; ob.select_set(True)
             if ob.data.users>1: ob.data=ob.data.copy()
             bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
-            ob.data.transform(mathutils.Matrix.Translation((float(os.environ.get('HB_DX','0')),0,0)))
+            cx=float(os.environ.get('HB_DX','0'))+float(os.environ.get('REAR_CX_'+SIDE.upper(),{'Kiri':'-0.019','Kanan':'0.012'}[SIDE]))   # + pemusatan cangkang ke tengah jok
+            ob.data.transform(mathutils.Matrix.Translation((cx,0,0)))
             bm=bmesh.new(); bm.from_mesh(ob.data)
             bmesh.ops.dissolve_limit(bm,angle_limit=math.radians(0.6),verts=bm.verts,edges=bm.edges,delimit={'MATERIAL'})
             bmesh.ops.triangulate(bm,faces=bm.faces); bm.to_mesh(ob.data); bm.free(); ob.data.update()
@@ -581,6 +582,41 @@ if REAR or REAR_IN:
             if v.index not in near:
                 h=tr.find_nearest(MWb@v.co); near[v.index]=None if h[0] is None else (h[0],h[3])
             return near[v.index]
+        if os.environ.get('REAR_SNAP','1')=='1':   # tarik tepi badan agar menempel ke kurva halus di tepi cangkang (pudar ke dalam beberapa ring)
+            KR=int(os.environ.get('SNAP_RINGS','7')); SM=int(os.environ.get('SNAP_SMOOTH','14'))
+            T={}; nb={}
+            for e in bm.edges:
+                if not e.is_boundary: continue
+                for v in e.verts:
+                    if v.index in T: continue
+                    r=nr(v)
+                    if r is not None and r[1]<DMAX: T[v.index]=mathutils.Vector(r[0])
+            for e in bm.edges:
+                if e.is_boundary and e.verts[0].index in T and e.verts[1].index in T:
+                    nb.setdefault(e.verts[0].index,[]).append(e.verts[1].index); nb.setdefault(e.verts[1].index,[]).append(e.verts[0].index)
+            for _ in range(SM):
+                T2={}
+                for vi,p in T.items():
+                    ns=nb.get(vi,[])
+                    T2[vi]=p if not ns else 0.5*p+0.5*(sum((T[n] for n in ns),mathutils.Vector())/len(ns))
+                T=T2
+            raw={vi:T[vi]-MWb@bm.verts[vi].co for vi in T}; ring={vi:0 for vi in T}; front=list(T.keys())
+            for r_ in range(1,KR+1):
+                nxt={}
+                for vi in front:
+                    vv=bm.verts[vi]
+                    for e in vv.link_edges:
+                        wi=e.other_vert(vv).index
+                        if wi in ring: continue
+                        nxt.setdefault(wi,[]).append(raw[vi])
+                for wi,ds in nxt.items():
+                    ring[wi]=r_; raw[wi]=sum(ds,mathutils.Vector())/len(ds)
+                front=list(nxt.keys())
+            R3=MWbi.to_3x3()
+            for vi,r_ in ring.items():
+                s_=1-r_/(KR+1); w_=s_*s_*(3-2*s_); bm.verts[vi].co+=R3@(raw[vi]*w_)
+            bm.to_mesh(me); me.update(); near.clear(); DMIN=max(DMIN,float(os.environ.get('SKIRT_DMIN2','0.004')))
+            print('tepi badan ditarik ke cangkang',len(T),'vert tepi')
         ne=0; pv={}; bv={}; b2=bmesh.new()
         def bvx(v):
             if v.index not in bv: bv[v.index]=b2.verts.new(MWb@v.co)
