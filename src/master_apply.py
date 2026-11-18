@@ -43,13 +43,14 @@ MATDEF={'leather_main':((0.045,0.046,0.05),0.0,0.55),'leather_pattern':((0.045,0
         'plastik_hitam':((0.025,0.025,0.028),0.0,0.5),'plastik_abu':((0.2,0.2,0.2),0.0,0.5),'pad_hitam':((0.045,0.045,0.047),0.0,0.6),
         'part_handle':((0.025,0.025,0.028),0.0,0.45),'part_cupholder':((0.025,0.025,0.028),0.0,0.5),
         'baja':((0.5,0.5,0.5),1.0,0.25),'aluminium':((0.55,0.56,0.58),1.0,0.4),'tuas_merah':((0.6,0.03,0.02),0.0,0.45)}
+WOOD={'kayu_atas':'satinfinishwalnut','kayu_samping':'satinfinishwalnut.001'}   # material kayu asli (tekstur Image_0 / Image_1) yang dipakai ulang
 def cat(m,onbody):
     n=m.name if m else ''
     if onbody and n in LEATHER: return LEATHER[n]
     if n in ('Bahan.001','tuas'): return 'tuas_merah'
     if n.startswith('polished') or n in ('Material_5','Material_6'): return 'baja'
     if n.startswith('satinfinishalu'): return 'aluminium'
-    if n.startswith('satinfinishwalnut'): return 'pad_hitam'
+    if n.startswith('satinfinishwalnut'): return 'kayu_samping' if n.rsplit('.',1)[-1] in ('001','002','005') else 'kayu_atas'   # kayu bertekstur di armrest: dipertahankan
     bc=(0,0,0)
     if m and m.use_nodes:
         b=next((x for x in m.node_tree.nodes if x.type=='BSDF_PRINCIPLED'),None)
@@ -68,7 +69,7 @@ def remap_mats(o,onbody=False,force=None):
     else: used=list(dict.fromkeys(cats))
     new=np.array([used.index(c) if c in used else 0 for c in cats],np.int32)
     me.materials.clear()
-    for c in used: me.materials.append(mk(c,*MATDEF[c]))
+    for c in used: me.materials.append(bpy.data.materials[WOOD[c]] if c in WOOD else mk(c,*MATDEF[c]))
     me.polygons.foreach_set('material_index',new[mi]); me.update()
 
 # ---- 3) pecah alas kaki (satu mesh Meshy: bagian depan = footrest, sisanya rangka dasar) ----
@@ -106,6 +107,7 @@ for o in objs:
     elif p.startswith('Assem-FRAME GAS SPRING'): nm='Sandaran_Belakang'; r=SHELL_R
     elif n=='Tuas': nm='Handrest_Kanan_Tuas'; r=1.0
     else: nm='Rangka_Lain'; r=1.0
+    if any(m and 'walnut' in m.name for m in o.data.materials): r=max(r,float(env('WOOD_RATIO','0.4')))
     ctr=bbox(o); cx=float((ctr[0][0]+ctr[1][0])/2)
     if nm.startswith(('Sandaran_Belakang','Handle','Cupholder')): nm+= '_Kiri' if cx<XC else '_Kanan'
     FORCE_OBJ[o.name]=FORCE.get(nm.rsplit('_',1)[0] if nm.endswith(('_Kiri','_Kanan')) else nm)
