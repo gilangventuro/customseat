@@ -8,6 +8,9 @@ import bpy,bmesh,mathutils,numpy as np,math,os,sys
 a=sys.argv[sys.argv.index('--')+1:]; SRC,OUT=a[0],a[1]
 env=lambda k,d: os.environ.get(k,d)
 bpy.ops.wm.open_mainfile(filepath=SRC)
+for _o in list(bpy.data.objects):   # blend bisa tersimpan saat objek masih di Edit Mode -> keluar dulu sebelum mesh diubah
+    if _o.type=='MESH' and _o.mode!='OBJECT':
+        bpy.context.view_layer.objects.active=_o; bpy.ops.object.mode_set(mode='OBJECT')
 
 BODY_T=int(env('BODY_TARGET','520000'));  PEDAL_BASE_T=int(env('PEDAL_BASE_TARGET','160000')); FOOT_T=int(env('FOOT_TARGET','90000'))
 HAND_R=float(env('HAND_RATIO','0.22'));   SHELL_R=float(env('SHELL_RATIO','0.7'));            CUP_R=float(env('CUP_RATIO','0.25'))
@@ -125,6 +128,7 @@ for o,nm,t,dl,onb in plan:
     ratio=(t/n0) if t>1 else t
     if ratio<1 and n0>1500:
         bpy.context.view_layer.objects.active=o
+        if o.mode!='OBJECT': bpy.ops.object.mode_set(mode='OBJECT')   # blend bisa tersimpan saat objek masih di Edit Mode
         md=o.modifiers.new('dec','DECIMATE'); md.ratio=max(ratio,0.005); md.delimit=dl
         if 'NORMAL' in dl: md.angle_limit=math.radians(25)
         bpy.ops.object.modifier_apply(modifier='dec')
