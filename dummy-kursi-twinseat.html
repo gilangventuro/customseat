@@ -438,6 +438,7 @@ const partsEl = document.getElementById('parts');
 function renderParts(){
   partsEl.innerHTML = '';
   PARTS3D.forEach(p => {
+    if (!(matRefs[p.key]||[]).length) return;   /* bagian tanpa material di model (mis. jahitan) tidak ditampilkan */
     const hex = state.c[p.key];
     const el = document.createElement('div'); el.className = 'part'+(state.open===p.key?' open':'');
     el.innerHTML = `<button class="part-row"><span class="sw-big ${hex?'':'sw orig'}" style="${hex?'background:'+hex:''}"></span>
@@ -466,7 +467,7 @@ function renderParts(){
   renderLogo();
 }
 function applyPreset(pr){
-  Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (tintBaseTexture) { m.map = tintBaseTexture; m.needsUpdate = true; } m.color.set(h); }); });
+  Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (tintBaseTexture && m.map) { m.map = tintBaseTexture; m.needsUpdate = true; } m.color.set(h); }); });
   update(); toast(pr.name+' diterapkan');
 }
 const presetMatch = pr => Object.keys(pr.c).every(k => pr.c[k]===state.c[k]);
@@ -698,7 +699,7 @@ new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp', tex => 
   tintBaseTexture = tex;
 });
 const origMap = {};
-loader.load('assets/twin-seat-meshy.glb?v=20261117e',
+loader.load('assets/twin-seat-meshy.glb?v=20261118a',
   gltf => {
     model = gltf.scene;
 
