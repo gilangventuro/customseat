@@ -38,7 +38,8 @@ def mk(name,col,met,rough):
     out=nt.nodes.new('ShaderNodeOutputMaterial'); bs=nt.nodes.new('ShaderNodeBsdfPrincipled')
     bs.inputs['Base Color'].default_value=(col[0],col[1],col[2],1); bs.inputs['Metallic'].default_value=met; bs.inputs['Roughness'].default_value=rough
     nt.links.new(bs.outputs['BSDF'],out.inputs['Surface']); m.diffuse_color=(col[0],col[1],col[2],1); return m
-LEATHER={'Body Utama':'leather_main','Boddy Dalam':'leather_pattern','defaultplastic.001':'leather_accent','Jahitan':'leather_stitch'}
+LEATHER={'Body Utama':'leather_main','Boddy Dalam':'leather_pattern','List Aksen':'leather_accent','defaultplastic.001':'leather_stitch','Jahitan':'leather_stitch',
+         'Kulit Utama':'leather_main','Kulit Utama.001':'leather_main','kulit dalam':'leather_pattern','kulit dalam.001':'leather_pattern'}   # badan + bantalan footrest
 MATDEF={'leather_main':((0.045,0.046,0.05),0.0,0.55),'leather_pattern':((0.045,0.046,0.05),0.0,0.55),'leather_accent':((0.02,0.40,0.075),0.0,0.5),'leather_stitch':((0.03,0.032,0.036),0.0,0.55),
         'plastik_hitam':((0.025,0.025,0.028),0.0,0.5),'plastik_abu':((0.2,0.2,0.2),0.0,0.5),'pad_hitam':((0.045,0.045,0.047),0.0,0.6),
         'part_handle':((0.025,0.025,0.028),0.0,0.45),'part_cupholder':((0.025,0.025,0.028),0.0,0.5),
@@ -92,6 +93,10 @@ bpy.data.objects.remove(ped); objs.remove(ped)
 # ---- 4) beri nama & tentukan jatah face ----
 plan=[]   # (obj,nama,target_face atau rasio,delimit,onbody)
 plan.append((body,'Kursi',BODY_T,{'MATERIAL'},True))
+CUSH_T=int(env('CUSHION_TARGET','180000'))
+for o in [x for x in objs if x.name.startswith('Meshy_AI_Stitched')]:   # bantalan footrest (kulit) -> ikut lepas/pasang bersama footrest
+    b_=bbox(o); side='Kiri' if (b_[0][0]+b_[1][0])/2<XC else 'Kanan'
+    plan.append((o,'Footrest_%s_Bantalan'%side,CUSH_T,{'MATERIAL'},True)); objs.remove(o)
 for o in pieces: plan.append((o,o.name,FOOT_T if o.name.startswith('Footrest') else PEDAL_BASE_T,{'NORMAL','MATERIAL'},False))
 cnt={}; FORCE={}; FORCE_OBJ={}
 def nxt(k): cnt[k]=cnt.get(k,-1)+1; return '%s_%02d'%(k,cnt[k])
