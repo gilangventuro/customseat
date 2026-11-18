@@ -41,6 +41,7 @@ def mk(name,col,met,rough):
 LEATHER={'Body Utama':'leather_main','Boddy Dalam':'leather_pattern','defaultplastic.001':'leather_accent','Jahitan':'leather_stitch'}
 MATDEF={'leather_main':((0.045,0.046,0.05),0.0,0.55),'leather_pattern':((0.045,0.046,0.05),0.0,0.55),'leather_accent':((0.02,0.40,0.075),0.0,0.5),'leather_stitch':((0.03,0.032,0.036),0.0,0.55),
         'plastik_hitam':((0.025,0.025,0.028),0.0,0.5),'plastik_abu':((0.2,0.2,0.2),0.0,0.5),'pad_hitam':((0.045,0.045,0.047),0.0,0.6),
+        'part_handle':((0.025,0.025,0.028),0.0,0.45),'part_cupholder':((0.025,0.025,0.028),0.0,0.5),
         'baja':((0.5,0.5,0.5),1.0,0.25),'aluminium':((0.55,0.56,0.58),1.0,0.4),'tuas_merah':((0.6,0.03,0.02),0.0,0.45)}
 def cat(m,onbody):
     n=m.name if m else ''
@@ -56,7 +57,9 @@ def cat(m,onbody):
     sat=max(bc)-min(bc)
     if sat<0.12 and 0.12<max(bc)<0.5: return 'plastik_abu'      # abu-abu yang memang diatur pengguna
     return 'plastik_hitam'                                     # hitam / warna penanda -> hitam
-def remap_mats(o,onbody=False):
+def remap_mats(o,onbody=False,force=None):
+    if force:   # bagian yang bisa diganti warna di situs: satu material khusus
+        me=o.data; me.materials.clear(); me.materials.append(mk(force,*MATDEF[force])); me.polygons.foreach_set('material_index',np.zeros(len(me.polygons),np.int32)); me.update(); return
     me=o.data; old=list(me.materials) or [None]; cats=[cat(m,onbody) for m in old]
     mi=np.empty(len(me.polygons),np.int32); me.polygons.foreach_get('material_index',mi); mi=np.clip(mi,0,len(old)-1)
     if onbody:
@@ -89,7 +92,7 @@ bpy.data.objects.remove(ped); objs.remove(ped)
 plan=[]   # (obj,nama,target_face atau rasio,delimit,onbody)
 plan.append((body,'Kursi',BODY_T,{'MATERIAL'},True))
 for o in pieces: plan.append((o,o.name,FOOT_T if o.name.startswith('Footrest') else PEDAL_BASE_T,{'NORMAL','MATERIAL'},False))
-cnt={}
+cnt={}; FORCE={}; FORCE_OBJ={}
 def nxt(k): cnt[k]=cnt.get(k,-1)+1; return '%s_%02d'%(k,cnt[k])
 for o in objs:
     if o is body: continue
@@ -98,17 +101,19 @@ for o in objs:
     elif p=='Assem2': nm='Handrest_Kanan'; r=HAND_R
     elif p=='Assem1--OPSI 3': nm='Handrest_Tengah'; r=HAND_R
     elif p=='Assem--FRAME KAKI': nm='Rangka_Kaki'; r=1.0
+    elif n.startswith('rev.3-HANDLE'): nm='Handle'; r=SHELL_R; FORCE['Handle']='part_handle'
+    elif n.startswith('Meshy_AI_Orange'): nm='Cupholder'; r=CUP_R; FORCE['Cupholder']='part_cupholder'
     elif p.startswith('Assem-FRAME GAS SPRING'): nm='Sandaran_Belakang'; r=SHELL_R
-    elif n.startswith('Meshy_AI_Orange'): nm='Sandaran_Belakang_Cup'; r=CUP_R
     elif n=='Tuas': nm='Handrest_Kanan_Tuas'; r=1.0
     else: nm='Rangka_Lain'; r=1.0
     ctr=bbox(o); cx=float((ctr[0][0]+ctr[1][0])/2)
-    if nm.startswith('Sandaran_Belakang'): nm+= '_Kiri' if cx<XC else '_Kanan'
+    if nm.startswith(('Sandaran_Belakang','Handle','Cupholder')): nm+= '_Kiri' if cx<XC else '_Kanan'
+    FORCE_OBJ[o.name]=FORCE.get(nm.rsplit('_',1)[0] if nm.endswith(('_Kiri','_Kanan')) else nm)
     plan.append((o,nxt(nm) if nm not in ('Handrest_Kanan_Tuas',) else nm,r,{'NORMAL','MATERIAL'},False))
 
 # ---- 5) remap material, decimate, smooth ----
 for o,nm,t,dl,onb in plan:
-    o.name=nm; o.data.name=nm; remap_mats(o,onb)
+    fm=FORCE_OBJ.get(o.name); o.name=nm; o.data.name=nm; remap_mats(o,onb,fm)
     n0=len(o.data.polygons)
     ratio=(t/n0) if t>1 else t
     if ratio<1 and n0>1500:

@@ -374,6 +374,10 @@ const PARTS3D = [
     mat:['leather_accent'], pal:LEATHER},
   {key:'stitch',  label:'Warna Jahitan', desc:'Benang jahitan dobel pada alur panel kiri-kanan',
     mat:['leather_stitch'], pal:LEATHER},
+  {key:'handle',  label:'Handle Sandaran', desc:'Pegangan di bagian atas cangkang belakang kiri-kanan',
+    mat:['part_handle'], pal:LEATHER},
+  {key:'cupholder', label:'Cup Holder', desc:'Tempat gelas di cangkang belakang kiri-kanan',
+    mat:['part_cupholder'], pal:LEATHER},
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
@@ -699,7 +703,7 @@ new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp', tex => 
   tintBaseTexture = tex;
 });
 const origMap = {};
-loader.load('assets/twin-seat-meshy.glb?v=20261118a',
+loader.load('assets/twin-seat-meshy.glb?v=20261118b',
   gltf => {
     model = gltf.scene;
 
