@@ -381,8 +381,8 @@ const PARTS3D = [
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
-/* warna bawaan kursi: cangkang/kulit utama abu-slate, motif hitam, list aksen hijau tua */
-const DEFAULT_COLORS = {main:'#3b424c', pattern:'#151617', accent:'#1b5a3a'};
+/* warna bawaan kursi: kulit utama hitam, motif abu-slate, list aksen teal, handle & cup holder hitam */
+const DEFAULT_COLORS = {main:'#1b1c1f', pattern:'#3a3e44', accent:'#1f5557', handle:'#1b1c1f', cupholder:'#1b1c1f'};
 
 const allPal = [...LEATHER];
 const nameOf = (hex, pal) => { if(!hex) return 'Warna asli'; const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase()); return f?f[0]:'Custom'; };
@@ -705,7 +705,7 @@ new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp', tex => 
   tintBaseTexture = tex;
 });
 const origMap = {};
-loader.load('assets/twin-seat-meshy.glb?v=20261118g',
+loader.load('assets/twin-seat-meshy.glb?v=20261118h',
   gltf => {
     model = gltf.scene;
 

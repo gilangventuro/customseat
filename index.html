@@ -142,6 +142,8 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/draco/');
 gltfLoader.setDRACOLoader(dracoLoader);
 
+/* warna bawaan Twin Captain Seat (sama dengan halaman edit) */
+const DEFAULT_COLORS = {leather_main:'#1b1c1f', leather_pattern:'#3a3e44', leather_accent:'#1f5557', part_handle:'#1b1c1f', part_cupholder:'#1b1c1f'};
 function getBaseModel(file, stripMaterials){
   if (sharedModels[file]) return sharedModels[file].promise;
   const isGltf = /\.(glb|gltf)$/i.test(file);
@@ -160,7 +162,7 @@ function getBaseModel(file, stripMaterials){
       obj.traverse(n => {
         if (!n.isMesh) return;
         const mats = Array.isArray(n.material) ? n.material : [n.material];
-        mats.forEach(m => { m.side = THREE.DoubleSide; });
+        mats.forEach(m => { m.side = THREE.DoubleSide; if (DEFAULT_COLORS[m.name]) m.color.set(DEFAULT_COLORS[m.name]); });
       });
       resolve(obj);
     };
