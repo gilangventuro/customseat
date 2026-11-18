@@ -381,6 +381,8 @@ const PARTS3D = [
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
+/* warna bawaan kursi: cangkang/kulit utama abu-slate, motif hitam, list aksen hijau tua */
+const DEFAULT_COLORS = {main:'#3b424c', pattern:'#151617', accent:'#1b5a3a'};
 
 const allPal = [...LEATHER];
 const nameOf = (hex, pal) => { if(!hex) return 'Warna asli'; const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase()); return f?f[0]:'Custom'; };
@@ -703,7 +705,7 @@ new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp', tex => 
   tintBaseTexture = tex;
 });
 const origMap = {};
-loader.load('assets/twin-seat-meshy.glb?v=20261118e',
+loader.load('assets/twin-seat-meshy.glb?v=20261118f',
   gltf => {
     model = gltf.scene;
 
@@ -752,6 +754,7 @@ loader.load('assets/twin-seat-meshy.glb?v=20261118e',
       mats.forEach(m => {
         const p = findPartByMat(m.name);
         if (!p) return;
+        if (DEFAULT_COLORS[p.key]) m.color.set(DEFAULT_COLORS[p.key]);   /* warna bawaan ("ASLI") */
         matRefs[p.key].push(m);
         origMap[p.key].push(m.map);
         if (origHex[p.key] === undefined) origHex[p.key] = m.color.getHexString();
