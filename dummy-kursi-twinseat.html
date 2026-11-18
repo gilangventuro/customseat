@@ -496,8 +496,8 @@ function renderReco(){
 }
 
 /* ===== Logo di headrest (upload PNG) ===== */
-const LOGO_SPOTS = [ {x:-0.41}, {x:0.41} ];   // pusat 2 headrest (koordinat lokal model, meter)
-const LOGO_Z = 0.75, LOGO_BOX_W = 0.26, LOGO_BOX_H = 0.10;
+const LOGO_SPOTS = [ {x:-0.85}, {x:0.53} ];   // pusat 2 headrest (koordinat lokal model, meter)
+const LOGO_Z = 2.55, LOGO_BOX_W = 0.30, LOGO_BOX_H = 0.11;
 const logoState = { url:null, name:'', aspect:1 };
 const logoMeshes = [];
 let logoTex = null;
@@ -703,7 +703,7 @@ new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp', tex => 
   tintBaseTexture = tex;
 });
 const origMap = {};
-loader.load('assets/twin-seat-meshy.glb?v=20261118d',
+loader.load('assets/twin-seat-meshy.glb?v=20261118e',
   gltf => {
     model = gltf.scene;
 
