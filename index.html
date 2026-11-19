@@ -126,6 +126,14 @@ const MODELS = [
     dummy: false,
     target: "dummy-kursi-twinseat.html",
   },
+  {
+    id: "kursi-twinseat-c", pickId: "kursi-twinseat",
+    name: "Twin Captain Seat",
+    desc: "Dari hasil scan 3D — detail jahitan & list asli, warna kulit bisa diganti.",
+    file: "assets/twin-seat-meshy.glb",
+    dummy: false,
+    target: "dummy-kursi-twinseat.html",
+  },
 ];
 
 const track = document.getElementById('track');
@@ -278,7 +286,9 @@ cards.forEach(setupMiniViewer);
 window.addEventListener('resize', () => cards.forEach(resizeViewer));
 
 /* ---------- carousel orbit: kursi lama berputar ke belakang lalu berhenti di sisi kiri (blur) ---------- */
-const PHI_FRONT = 0, PHI_LEFT = 270;
+const PHI_FRONT = 0;
+/* kursi tersusun melingkar: yang di tengah menghadap depan, sisanya tersebar rata di sekeliling (2 kursi -> 180, 3 kursi -> 120 & 240) */
+const goalPhi = i => (((i - centerIndex) % cards.length) + cards.length) % cards.length * 360 / cards.length;
 function poseCard(entry){
   const gap = Math.min(stage.clientWidth * 0.36, 400);
   const r = entry.phi * Math.PI / 180;
@@ -295,7 +305,7 @@ function poseCard(entry){
 }
 function layout(){
   cards.forEach((entry, i) => {
-    entry.phi = i === centerIndex ? PHI_FRONT : PHI_LEFT;
+    entry.phi = goalPhi(i);
     entry.el.classList.toggle('center', i === centerIndex);
     poseCard(entry);
   });
@@ -304,7 +314,7 @@ function layout(){
 let orbitRaf = null;
 function orbitTo(){
   const from = cards.map(e => e.phi), delta = cards.map((e, i) => {
-    const goal = i === centerIndex ? PHI_FRONT : PHI_LEFT;
+    const goal = goalPhi(i);
     return (((goal - e.phi) % 360) + 360) % 360;
   });
   cards.forEach((e, i) => e.el.classList.toggle('center', i === centerIndex));
