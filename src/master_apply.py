@@ -7,7 +7,6 @@
 import bpy,bmesh,mathutils,numpy as np,math,os,sys
 a=sys.argv[sys.argv.index('--')+1:]; SRC,OUT=a[0],a[1]
 env=lambda k,d: os.environ.get(k,d)
-sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); from stitch_mark import mark_stitch
 bpy.ops.wm.open_mainfile(filepath=SRC)
 for _o in list(bpy.data.objects):   # blend bisa tersimpan saat objek masih di Edit Mode -> keluar dulu sebelum mesh diubah
     if _o.type=='MESH' and _o.mode!='OBJECT':
@@ -131,7 +130,6 @@ for o in objs:
 # ---- 5) remap material, decimate, smooth ----
 for o,nm,t,dl,onb in plan:
     fm=FORCE_OBJ.get(o.name); o.name=nm; o.data.name=nm; remap_mats(o,onb,fm)
-    if onb: print('jahitan tegas',nm,mark_stitch(o,mk,MATDEF))   # alur jahitan pada panel kulit -> material leather_stitch (warna bisa diganti)
     n0=len(o.data.polygons)
     ratio=(t/n0) if t>1 else t
     if ratio<1 and n0>1500:
