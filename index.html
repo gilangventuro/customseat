@@ -111,15 +111,15 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 /* ---------- daftar model (ganti "file" per model saat aset asli sudah ada) ---------- */
 const MODELS = [
   {
-    id: "kursi-gaming-pro",
-    name: "VIP Seat",
-    desc: "Model 3D asli yang dipakai untuk menguji simulator (putar, zoom & ganti warna).",
-    file: "assets/kursipijat.fbx",
+    id: "kursi-twinseat",
+    name: "Twin Captain Seat",
+    desc: "Dari hasil scan 3D — detail jahitan & list asli, warna kulit bisa diganti.",
+    file: "assets/twin-seat-meshy.glb",
     dummy: false,
-    target: "dummy-kursi-gaming.html",
+    target: "dummy-kursi-twinseat.html",
   },
   {
-    id: "kursi-twinseat",
+    id: "kursi-twinseat-b", pickId: "kursi-twinseat",
     name: "Twin Captain Seat",
     desc: "Dari hasil scan 3D — detail jahitan & list asli, warna kulit bisa diganti.",
     file: "assets/twin-seat-meshy.glb",
@@ -330,19 +330,11 @@ const ICONS = {
   finish:'<svg viewBox="0 0 24 24"><path d="M12 3l2.2 5.3L20 10l-5.8 1.7L12 17l-2.2-5.3L4 10l5.8-1.7z"/><path d="M19 16v4M17 18h4"/></svg>',
   size:'<svg viewBox="0 0 24 24"><path d="m14 4 6 6L10 20l-6-6z"/><path d="m8 10 2 2M11 7l2 2M5 13l2 2"/></svg>'
 };
-MODELS.find(m => m.id === 'kursi-gaming-pro').specs = [
-  { icon:'seat',    k:'Konfigurasi',   v:'1 Seat' },
-  { icon:'leather', k:'Material Cover', v:'Synthetic Leather' },
-  { icon:'frame',   k:'Rangka',        v:'Metal Frame' },
-  { icon:'stitch',  k:'Jahitan',       v:'Premium Stitching' },
-  { icon:'finish',  k:'Finishing',     v:'Emboss / Quilted' },
-  { icon:'size',    k:'Dimensi',       v:'60 × 85 cm' }
-];
-MODELS.find(m => m.id === 'kursi-twinseat').specs = [
+MODELS.forEach(m => { if ((m.pickId||m.id) === 'kursi-twinseat') m.specs = [
   { icon:'leather', k:'Model Busa',        v:'Alpha' },
   { icon:'stitch',  k:'Jahitan',           v:'Valhalla - PM26' },
   { icon:'seat',    k:'Konfigurasi Seat',  v:'2 - 2' }
-];
+]; });
 const specsEl = document.getElementById('specs'), ctaEl = document.querySelector('.cta');
 let specsTimer = null, specsFor = null;
 function updateSpecs(delay){
@@ -392,7 +384,7 @@ document.addEventListener('keydown', e => {
 
 btnPick.onclick = () => {
   const m = cards[centerIndex].model;
-  window.location.href = m.target + '?model=' + encodeURIComponent(m.id);
+  window.location.href = m.target + '?model=' + encodeURIComponent(m.pickId || m.id);
 };
 
 layout();
