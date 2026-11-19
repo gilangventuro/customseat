@@ -308,7 +308,7 @@ function poseCard(entry){
   const gap = Math.min(stage.clientWidth * 0.36, 400);
   const r = entry.phi * Math.PI / 180;
   const d = Math.cos(r), x = Math.sin(r) * gap;
-  const scale = 1.15 * (d >= 0 ? 0.68 + 0.32 * d : 0.68 + 0.14 * d);
+  const scale = 1.265 * (d >= 0 ? 0.68 + 0.32 * d : 0.68 + 0.14 * d);
   const y = d < 0 ? d * 18 : 0;
   const blur = d >= 0 ? 2.5 * (1 - d) : 2.5 + 2.5 * -d;
   const op = d >= 0 ? 0.55 + 0.45 * d : 0.55 + 0.15 * d;
