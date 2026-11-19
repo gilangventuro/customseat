@@ -63,18 +63,21 @@
   .specs li svg{width:18px;height:18px;flex:0 0 auto;stroke:#4a4e55;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
   .specs li .k{color:#3a3d43;flex:1}
   .specs li .v{font-weight:600;text-align:right;color:var(--text)}
-  /* ---------- pager: lingkaran kecil = model lain, model terpilih memanjang + nama; panah kiri-kanan untuk berpindah ---------- */
-  .pager{display:flex;align-items:center;justify-content:center;gap:18px;padding:6px 16px 26px}
-  .pg-dots{display:flex;align-items:center;gap:10px}
-  .pg-dot{height:12px;width:12px;border-radius:999px;border:0;padding:0;cursor:pointer;background:rgba(60,70,90,.28);color:#fff;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;display:flex;align-items:center;justify-content:center;
-    transition:width .5s cubic-bezier(.2,1.1,.3,1),height .3s,background .3s,box-shadow .3s}
-  .pg-dot:hover{background:rgba(60,70,90,.45)}
-  .pg-dot span{opacity:0;transition:opacity .25s}
-  .pg-dot.on{width:190px;height:30px;background:var(--brand);cursor:default;box-shadow:0 8px 18px -8px rgba(30,120,50,.7)}
-  .pg-dot.on span{opacity:1;transition:opacity .3s ease .25s}
-  .pg-arrow{width:34px;height:34px;border-radius:50%;border:1px solid rgba(60,70,90,.18);background:rgba(255,255,255,.7);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:.15s}
-  .pg-arrow:hover{background:#fff;border-color:rgba(60,70,90,.35)}
-  .pg-arrow svg{width:16px;height:16px;stroke:#3a3d43;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  /* ---------- pager: garis tipis per model + nomor, yang terpilih memanjang dengan nama; panah kiri-kanan untuk berpindah ---------- */
+  .pager{display:flex;align-items:center;justify-content:center;gap:26px;padding:6px 16px 26px}
+  .pg-dots{display:flex;align-items:flex-start;gap:14px}
+  .pg-dot{background:none;border:0;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:30px;transition:width .55s cubic-bezier(.2,1.1,.3,1);color:#8a9097;font-size:11.5px;letter-spacing:.3px;white-space:nowrap;text-align:left}
+  .pg-line{display:block;width:100%;height:2px;border-radius:2px;background:rgba(60,70,90,.28);transition:background .3s,height .3s}
+  .pg-dot:hover .pg-line{background:rgba(60,70,90,.5)}
+  .pg-lab{display:flex;gap:10px;overflow:hidden;max-width:100%}
+  .pg-name{opacity:0;transition:opacity .25s}
+  .pg-dot.on{width:190px;cursor:default;color:var(--text)}
+  .pg-dot.on .pg-line{background:var(--text)}
+  .pg-dot.on .pg-name{opacity:1;transition:opacity .3s ease .25s;font-weight:600}
+  .pg-arrow{background:none;border:0;padding:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:.6;transition:opacity .15s,transform .15s}
+  .pg-arrow:hover{opacity:1}
+  #pgPrev:hover{transform:translateX(-3px)} #pgNext:hover{transform:translateX(3px)}
+  .pg-arrow svg{width:34px;height:14px;stroke:#2a2d33;fill:none;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round}
   /* mobile / layar sempit: kartu di bawah model, animasi tumbuh dari atas ke bawah */
   @media (max-width:1000px){
     .stage{flex:none;display:block;overflow:hidden;padding-bottom:24px}
@@ -105,9 +108,9 @@
     </div>
   </div>
   <nav class="pager" id="pager" aria-label="Pilih model">
-    <button class="pg-arrow" id="pgPrev" aria-label="Model sebelumnya"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="pg-arrow" id="pgPrev" aria-label="Model sebelumnya"><svg viewBox="0 0 34 14"><path d="M33 7H2M7 2L2 7l5 5"/></svg></button>
     <div class="pg-dots" id="pgDots"></div>
-    <button class="pg-arrow" id="pgNext" aria-label="Model berikutnya"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    <button class="pg-arrow" id="pgNext" aria-label="Model berikutnya"><svg viewBox="0 0 34 14"><path d="M1 7h31M27 2l5 5-5 5"/></svg></button>
   </nav>
 </div>
 
@@ -381,7 +384,7 @@ const pgDots = document.getElementById('pgDots');
 cards.forEach((entry, i) => {
   const b = document.createElement('button');
   b.className = 'pg-dot'; b.title = entry.model.name; b.setAttribute('aria-label', entry.model.name);
-  b.innerHTML = '<span>' + entry.model.name + '</span>';
+  b.innerHTML = '<i class="pg-line"></i><span class="pg-lab"><span>' + String(i + 1).padStart(2, '0') + '</span><span class="pg-name">' + entry.model.name + '</span></span>';
   b.onclick = () => { if (i !== centerIndex) setCenter(i); };
   pgDots.appendChild(b);
 });
