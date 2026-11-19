@@ -41,7 +41,7 @@
 
 
   /* ---------- panel spesifikasi: muncul dari belakang kursi (gepeng -> mekar) ---------- */
-  .side{position:absolute;top:50%;left:calc(50% + 285px);width:min(340px,calc(50vw - 300px));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
+  .side{position:absolute;top:50%;left:calc(50% + 345px);width:min(340px,calc(50vw - 365px));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
   .specs{pointer-events:none;
     transform-origin:0 50%;transform:translateX(-190px) scale(.03,.42);opacity:0;
     transition:transform .1s ease-in,opacity .1s ease-in;
@@ -64,7 +64,7 @@
   .specs li .k{color:#3a3d43;flex:1}
   .specs li .v{font-weight:600;text-align:right;color:var(--text)}
   /* mobile / layar sempit: kartu di bawah model, animasi tumbuh dari atas ke bawah */
-  @media (max-width:1000px){
+  @media (max-width:1100px){
     .stage{flex:none;display:block;overflow:hidden;padding-bottom:24px}
     .track{height:340px}
     .card{height:100%}
@@ -290,9 +290,11 @@ const PHI_FRONT = 0;
 /* kursi tersusun melingkar: yang di tengah menghadap depan, sisanya tersebar rata di sekeliling (2 kursi -> 180, 3 kursi -> 120 & 240) */
 const goalPhi = i => (((i - centerIndex) % cards.length) + cards.length) % cards.length * 360 / cards.length;
 function poseCard(entry){
-  const gap = Math.min(stage.clientWidth * 0.36, 400);
+  const wide = !matchMedia('(max-width:1100px)').matches;   /* desktop: kursi digeser ke kiri & lingkarannya dirapatkan supaya kartu spesifikasi di kanan tidak tertutup */
+  const gap = wide ? Math.min(stage.clientWidth * 0.36, 280) : Math.min(stage.clientWidth * 0.36, 400);
+  const shift = wide ? Math.min(110, stage.clientWidth * 0.09) : 0;
   const r = entry.phi * Math.PI / 180;
-  const d = Math.cos(r), x = Math.sin(r) * gap;
+  const d = Math.cos(r), x = Math.sin(r) * gap - shift;
   const scale = d >= 0 ? 0.68 + 0.32 * d : 0.68 + 0.14 * d;
   const y = d < 0 ? d * 18 : 0;
   const blur = d >= 0 ? 2.5 * (1 - d) : 2.5 + 2.5 * -d;
@@ -303,6 +305,7 @@ function poseCard(entry){
   el.style.opacity = op;
   el.style.filter = blur < 0.05 ? 'none' : `blur(${blur}px)`;
 }
+window.addEventListener('resize', () => cards.forEach(e => poseCard(e)));
 function layout(){
   cards.forEach((entry, i) => {
     entry.phi = goalPhi(i);
