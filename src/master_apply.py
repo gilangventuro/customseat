@@ -31,6 +31,10 @@ print('mesh',len(objs),'face total',sum(len(o.data.polygons) for o in objs))
 def bbox(o):
     n=len(o.data.vertices); P=np.empty(n*3); o.data.vertices.foreach_get('co',P); P=P.reshape(-1,3); return P.min(0),P.max(0)
 body=next(o for o in objs if o.name.startswith('Meshy_AI_Twin_Luxe_Seats'))
+bm_=bmesh.new(); bm_.from_mesh(body.data)   # buang sisa geometri liar di dekat lantai (z<0.5) yang kadang tertinggal di file master & menggeser titik tengah badan
+st_=[v for v in bm_.verts if v.co.z<0.5]
+if st_: print('buang geometri liar',len(st_)); bmesh.ops.delete(bm_,geom=st_,context='VERTS'); bm_.to_mesh(body.data); body.data.update()
+bm_.free()
 b0,b1=bbox(body); XC=float((b0[0]+b1[0])/2); print('badan x',b0[0],b1[0],'XC',XC)
 
 # ---- 2) material ----
