@@ -20,6 +20,7 @@
   .wrap{flex:1;display:flex;flex-direction:column;min-height:0}
   .topbar{display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px 24px 4px;text-align:center}
   .topbar img{height:36px;width:auto}
+  @media (min-width:1001px){ .topbar{margin-left:calc(50% + 285px);width:min(340px,calc(50vw - 300px));padding-left:0;padding-right:0} }   /* logo sejajar tengah kartu spesifikasi */
   .topbar span{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
 
   .stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:pan-y;cursor:grab}
@@ -34,14 +35,14 @@
   .card .name{display:none;text-align:center;font-size:14px;font-weight:700;margin-top:6px}
   .card .name small{display:block;font-weight:500;color:var(--muted);font-size:11.5px;margin-top:2px}
 
-  .stage{padding-bottom:12px}
+  .stage{padding-bottom:64px}   /* kursi sedikit naik */
   .btn-pick{margin-top:4px;background:var(--brand);border:1px solid var(--brand);color:#fff;border-radius:12px;padding:13px 32px;font-size:14.5px;font-weight:700;cursor:pointer;transition:.15s}
   .btn-pick:hover{background:var(--brand-2)}
   .hint{font-size:11.5px;color:var(--muted);margin-top:10px}
 
 
   /* ---------- panel spesifikasi: muncul dari belakang kursi (gepeng -> mekar) ---------- */
-  .side{position:absolute;top:50%;left:calc(50% + 285px);width:min(340px,calc(50vw - 300px));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
+  .side{position:absolute;top:calc(50% - 32px);left:calc(50% + 285px);width:min(340px,calc(50vw - 300px));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
   .specs{pointer-events:none;
     transform-origin:0 50%;transform:translateX(-190px) scale(.03,.42);opacity:0;
     transition:transform .1s ease-in,opacity .1s ease-in;
@@ -53,6 +54,7 @@
   .cta{transform-origin:0 50%;transform:translateX(-190px) scale(.03,.42);opacity:0;pointer-events:none;transition:transform .1s ease-in,opacity .1s ease-in;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
   .cta.show{transform:none;opacity:1;pointer-events:auto;transition:transform .6s cubic-bezier(.2,1.25,.35,1) .3s,opacity .3s ease .3s}
   .cta .btn-pick{margin-top:0;width:100%}
+  .specs .cta{transform:none;opacity:1;pointer-events:auto;transition:none;padding:0 24px 22px}   /* tombol pilih model ada di dalam kartu */
   .cta .hint{margin-top:6px}
   .specs h3{margin:0;padding:22px 24px 6px;font-size:21px;font-weight:700;letter-spacing:-.2px}
   .specs ul{list-style:none;margin:0;padding:6px 24px 14px}
@@ -64,7 +66,7 @@
   .specs li .k{color:#3a3d43;flex:1}
   .specs li .v{font-weight:600;text-align:right;color:var(--text)}
   /* ---------- pager: garis tipis per model + nomor, yang terpilih memanjang dengan nama; panah kiri-kanan untuk berpindah ---------- */
-  .pager{display:flex;align-items:center;justify-content:space-between;gap:26px;padding:6px 0 26px;width:55vw;margin:0 0 0 12vw}   /* panah di ujung kiri & kanan area model, titik di tengah */
+  .pager{display:flex;align-items:center;justify-content:space-between;gap:26px;padding:6px 0 64px;width:55vw;margin:0 0 0 12vw}   /* panah di ujung kiri & kanan area model, titik di tengah */
   .pg-dots{display:flex;align-items:flex-start;gap:14px}
   .pg-dot{background:none;border:0;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;gap:8px;width:30px;transition:width .55s cubic-bezier(.2,1.1,.3,1);color:#8a9097;font-size:11.5px;letter-spacing:.3px;white-space:nowrap;text-align:left}
   .pg-line{display:block;width:100%;height:2px;border-radius:2px;background:rgba(60,70,90,.28);transition:background .3s,height .3s}
@@ -101,11 +103,13 @@
   <div class="stage" id="stage">
     <div class="track" id="track"></div>
     <div class="side">
-      <aside class="specs" id="specs" aria-label="Spesifikasi"></aside>
-      <div class="cta">
-        <button class="btn-pick" id="btnPick">Pilih model ini</button>
-        <div class="hint">Model akan dibuka di halaman edit warna &amp; material.</div>
-      </div>
+      <aside class="specs" id="specs" aria-label="Spesifikasi">
+        <div id="specsBody"></div>
+        <div class="cta">
+          <button class="btn-pick" id="btnPick">Pilih model ini</button>
+          <div class="hint">Model akan dibuka di halaman edit warna &amp; material.</div>
+        </div>
+      </aside>
     </div>
   </div>
   <nav class="pager" id="pager" aria-label="Pilih model">
@@ -356,7 +360,7 @@ MODELS.forEach(m => { if ((m.pickId||m.id) === 'kursi-twinseat') m.specs = [
   { icon:'stitch',  k:'Jahitan',           v:'Valhalla - PM26' },
   { icon:'seat',    k:'Konfigurasi Seat',  v:'2 - 2' }
 ]; });
-const specsEl = document.getElementById('specs'), ctaEl = document.querySelector('.cta');
+const specsEl = document.getElementById('specs'), specsBody = document.getElementById('specsBody'), ctaEl = document.querySelector('.cta');
 let specsTimer = null, specsFor = null;
 function updateSpecs(delay){
   const m = cards[centerIndex].model;
@@ -365,7 +369,7 @@ function updateSpecs(delay){
   if (specsFor === m.id && specsEl.classList.contains('show')) return;
   specsEl.classList.remove('show'); ctaEl.classList.remove('show');
   specsTimer = setTimeout(() => {
-    specsEl.innerHTML = `<h3>Spesifikasi</h3><ul>` + m.specs.map((r, i) =>
+    specsBody.innerHTML = `<h3>Spesifikasi</h3><ul>` + m.specs.map((r, i) =>
       `<li style="--d:${0.35 + i * 0.07}s">${ICONS[r.icon]}<span class="k">${r.k}</span><span class="v">${r.v}</span></li>`).join('') + '</ul>';
     specsFor = m.id;
     void specsEl.offsetWidth;            /* paksa reflow supaya animasi mulai dari kondisi gepeng */
