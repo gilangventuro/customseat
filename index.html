@@ -41,7 +41,7 @@
 
 
   /* ---------- panel spesifikasi: muncul dari belakang kursi (gepeng -> mekar) ---------- */
-  .side{position:absolute;top:50%;left:calc(50% + var(--mpk,360px) - var(--mshift,110px));width:min(340px,calc(50vw - var(--mpk,360px) - 20px + var(--mshift,110px)));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
+  .side{position:absolute;top:50%;left:calc(50% + 285px);width:min(340px,calc(50vw - 300px));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
   .specs{pointer-events:none;
     transform-origin:0 50%;transform:translateX(-190px) scale(.03,.42);opacity:0;
     transition:transform .1s ease-in,opacity .1s ease-in;
@@ -64,7 +64,7 @@
   .specs li .k{color:#3a3d43;flex:1}
   .specs li .v{font-weight:600;text-align:right;color:var(--text)}
   /* mobile / layar sempit: kartu di bawah model, animasi tumbuh dari atas ke bawah */
-  @media (max-width:1100px){
+  @media (max-width:1000px){
     .stage{flex:none;display:block;overflow:hidden;padding-bottom:24px}
     .track{height:340px}
     .card{height:100%}
@@ -278,17 +278,11 @@ cards.forEach(setupMiniViewer);
 window.addEventListener('resize', () => cards.forEach(resizeViewer));
 
 /* ---------- carousel orbit: kursi lama berputar ke belakang lalu berhenti di sisi kiri (blur) ---------- */
-const PHI_FRONT = 0;
-/* kursi tersusun melingkar: yang di tengah menghadap depan, sisanya tersebar rata di sekeliling (2 kursi -> 180, 3 kursi -> 120 & 240) */
-const goalPhi = i => { const n = cards.length, d = ((i - centerIndex) % n + n) % n; return d === 0 ? PHI_FRONT : (n === 2 ? 270 : d * 360 / n); };
+const PHI_FRONT = 0, PHI_LEFT = 270;
 function poseCard(entry){
-  const wide = !matchMedia('(max-width:1100px)').matches;   /* desktop: kursi digeser ke kiri & lingkarannya dirapatkan supaya kartu spesifikasi di kanan tidak tertutup */
-  const gap = wide ? Math.min(stage.clientWidth * 0.36, cards.length === 2 ? 300 : 340) : Math.min(stage.clientWidth * 0.36, 400);
-  const shift = wide ? (cards.length === 2 ? Math.min(120, stage.clientWidth * 0.08) : Math.min(202, stage.clientWidth * 0.134)) : 0;   /* kursi & kartu spesifikasi digeser bersama supaya margin kiri = kanan */
-  document.documentElement.style.setProperty('--mshift', shift + 'px');
-  document.documentElement.style.setProperty('--mpk', (cards.length === 2 ? 360 : 507) + 'px');
+  const gap = Math.min(stage.clientWidth * 0.36, 400);
   const r = entry.phi * Math.PI / 180;
-  const d = Math.cos(r), x = Math.sin(r) * gap - shift;
+  const d = Math.cos(r), x = Math.sin(r) * gap;
   const scale = d >= 0 ? 0.68 + 0.32 * d : 0.68 + 0.14 * d;
   const y = d < 0 ? d * 18 : 0;
   const blur = d >= 0 ? 2.5 * (1 - d) : 2.5 + 2.5 * -d;
@@ -299,10 +293,9 @@ function poseCard(entry){
   el.style.opacity = op;
   el.style.filter = blur < 0.05 ? 'none' : `blur(${blur}px)`;
 }
-window.addEventListener('resize', () => cards.forEach(e => poseCard(e)));
 function layout(){
   cards.forEach((entry, i) => {
-    entry.phi = goalPhi(i);
+    entry.phi = i === centerIndex ? PHI_FRONT : PHI_LEFT;
     entry.el.classList.toggle('center', i === centerIndex);
     poseCard(entry);
   });
@@ -311,7 +304,7 @@ function layout(){
 let orbitRaf = null;
 function orbitTo(){
   const from = cards.map(e => e.phi), delta = cards.map((e, i) => {
-    const goal = goalPhi(i);
+    const goal = i === centerIndex ? PHI_FRONT : PHI_LEFT;
     return (((goal - e.phi) % 360) + 360) % 360;
   });
   cards.forEach((e, i) => e.el.classList.toggle('center', i === centerIndex));
