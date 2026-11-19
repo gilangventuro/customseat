@@ -378,6 +378,8 @@ const PARTS3D = [
     mat:['part_handle'], pal:LEATHER},
   {key:'cupholder', label:'Cup Holder', desc:'Tempat gelas di cangkang belakang kiri-kanan',
     mat:['part_cupholder'], pal:LEATHER},
+  {key:'wood', label:'Kayu Armrest', desc:'Panel kayu di armrest: pilih kayu original atau grey gelap motif kayu',
+    mat:['satinfinishwalnut','satinfinishwalnut.001'], pal:[['Grey Gelap Motif Kayu','#8c9096']], woodMode:true},
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
@@ -421,6 +423,7 @@ function updateFlash(){
 function applyColor(key, hex){
   state.c[key] = hex;
   (matRefs[key]||[]).forEach(m => {
+    if (findPart(key).woodMode) { m.map = greyWoodTex(m.map); m.color.set(hex); m.needsUpdate = true; return; }
     if (tintBaseTexture && m.map) { m.map = tintBaseTexture; m.needsUpdate = true; }   /* benang jahitan = warna polos, tanpa tekstur */
     m.color.set(hex);
   });
@@ -451,7 +454,7 @@ function renderParts(){
       <span class="t"><b>${p.label}</b><small>${nameOf(hex,p.pal)}${hex?' · '+hex.toUpperCase():''}</small></span>
       <svg class="chev" width="16" height="16" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></button>
       <div class="part-body"><p class="desc">${p.desc}</p><div class="grid"></div>
-      <label class="custom">Warna custom <input type="color" value="${hex||'#'+(origHex[p.key]||'808080')}"><input type="text" value="${(hex||'').toUpperCase()}" placeholder="#RRGGBB" maxlength="7"></label></div>`;
+      ${p.woodMode?'':`<label class="custom">Warna custom <input type="color" value="${hex||'#'+(origHex[p.key]||'808080')}"><input type="text" value="${(hex||'').toUpperCase()}" placeholder="#RRGGBB" maxlength="7"></label>`}</div>`;
     el.querySelector('.part-row').onclick = () => {
       const opening = state.open !== p.key;
       state.open = opening ? p.key : null;
@@ -459,13 +462,13 @@ function renderParts(){
       if (opening) flashPart(p.key);
     };
     const grid = el.querySelector('.grid');
-    const ob = document.createElement('button'); ob.className = 'sw orig'+(!hex?' sel':''); ob.title = 'Warna asli'; ob.textContent = 'ASLI';
+    const ob = document.createElement('button'); ob.className = 'sw orig'+(!hex?' sel':''); ob.title = p.woodMode?'Kayu original':'Warna asli'; ob.textContent = 'ASLI';
     ob.onclick = () => { resetPart(p.key); }; grid.appendChild(ob);
     p.pal.forEach(([n,h]) => { const b = document.createElement('button'); b.className = 'sw'+(hex===h?' sel':''); b.style.background = h; b.title = n;
       b.onclick = () => applyColor(p.key, h); grid.appendChild(b); });
     const [ci, ti] = el.querySelectorAll('.custom input');
-    ci.oninput = e => { applyColor(p.key, e.target.value.toLowerCase()); };
-    ti.onchange = e => { let v = e.target.value.trim(); if(v && !v.startsWith('#')) v = '#'+v; if(/^#[0-9a-f]{6}$/i.test(v)) applyColor(p.key, v.toLowerCase()); else e.target.value = (hex||'').toUpperCase(); };
+    if (ci) ci.oninput = e => { applyColor(p.key, e.target.value.toLowerCase()); };
+    if (ti) ti.onchange = e => { let v = e.target.value.trim(); if(v && !v.startsWith('#')) v = '#'+v; if(/^#[0-9a-f]{6}$/i.test(v)) applyColor(p.key, v.toLowerCase()); else e.target.value = (hex||'').toUpperCase(); };
     partsEl.appendChild(el);
   });
   renderReco();
@@ -705,7 +708,22 @@ new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp', tex => 
   tintBaseTexture = tex;
 });
 const origMap = {};
-loader.load('assets/twin-seat-meshy.glb?v=20261119c',
+/* kayu grey gelap: tekstur kayu asli dijadikan hitam-putih & digelapkan, motif serat tetap terlihat */
+const greyCache = new WeakMap();
+function greyWoodTex(src){
+  if (!src || !src.image) return src;
+  if (greyCache.has(src)) return greyCache.get(src);
+  const im = src.image, w = im.width||im.naturalWidth, h = im.height||im.naturalHeight;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0);
+  const d = cx.getImageData(0, 0, w, h), a = d.data;
+  for (let i = 0; i < a.length; i += 4) { const y = (a[i]*0.299 + a[i+1]*0.587 + a[i+2]*0.114) * 0.62; a[i] = a[i+1] = a[i+2] = y; }
+  cx.putImageData(d, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.flipY = src.flipY; t.colorSpace = src.colorSpace; t.wrapS = src.wrapS; t.wrapT = src.wrapT; t.anisotropy = src.anisotropy; t.channel = src.channel;
+  greyCache.set(src, t); return t;
+}
+loader.load('assets/twin-seat-meshy.glb?v=20261119d',
   gltf => {
     model = gltf.scene;
 
