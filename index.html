@@ -339,12 +339,9 @@ MODELS.find(m => m.id === 'kursi-gaming-pro').specs = [
   { icon:'size',    k:'Dimensi',       v:'60 × 85 cm' }
 ];
 MODELS.find(m => m.id === 'kursi-twinseat').specs = [
-  { icon:'seat',    k:'Konfigurasi',   v:'2 Seat' },
-  { icon:'leather', k:'Material Cover', v:'Synthetic Leather' },
-  { icon:'frame',   k:'Rangka',        v:'Metal Frame' },
-  { icon:'stitch',  k:'Jahitan',       v:'Premium Stitching' },
-  { icon:'finish',  k:'Finishing',     v:'Emboss / Quilted' },
-  { icon:'size',    k:'Dimensi',       v:'120 × 85 cm' }
+  { icon:'leather', k:'Model Busa',        v:'Alpha' },
+  { icon:'stitch',  k:'Jahitan',           v:'Valhalla - PM26' },
+  { icon:'seat',    k:'Konfigurasi Seat',  v:'2 - 2' }
 ];
 const specsEl = document.getElementById('specs'), ctaEl = document.querySelector('.cta');
 let specsTimer = null, specsFor = null;
@@ -355,7 +352,7 @@ function updateSpecs(delay){
   if (specsFor === m.id && specsEl.classList.contains('show')) return;
   specsEl.classList.remove('show'); ctaEl.classList.remove('show');
   specsTimer = setTimeout(() => {
-    specsEl.innerHTML = `<h3>${m.name}</h3><ul>` + m.specs.map((r, i) =>
+    specsEl.innerHTML = `<h3>Spesifikasi</h3><ul>` + m.specs.map((r, i) =>
       `<li style="--d:${0.35 + i * 0.07}s">${ICONS[r.icon]}<span class="k">${r.k}</span><span class="v">${r.v}</span></li>`).join('') + '</ul>';
     specsFor = m.id;
     void specsEl.offsetWidth;            /* paksa reflow supaya animasi mulai dari kondisi gepeng */
