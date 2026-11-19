@@ -41,7 +41,7 @@
 
 
   /* ---------- panel spesifikasi: muncul dari belakang kursi (gepeng -> mekar) ---------- */
-  .side{position:absolute;top:50%;left:calc(50% + 455px - var(--mshift,110px));width:min(340px,calc(50vw - 475px + var(--mshift,110px)));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
+  .side{position:absolute;top:50%;left:calc(50% + 507px - var(--mshift,110px));width:min(340px,calc(50vw - 527px + var(--mshift,110px)));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
   .specs{pointer-events:none;
     transform-origin:0 50%;transform:translateX(-190px) scale(.03,.42);opacity:0;
     transition:transform .1s ease-in,opacity .1s ease-in;
@@ -291,8 +291,8 @@ const PHI_FRONT = 0;
 const goalPhi = i => (((i - centerIndex) % cards.length) + cards.length) % cards.length * 360 / cards.length;
 function poseCard(entry){
   const wide = !matchMedia('(max-width:1100px)').matches;   /* desktop: kursi digeser ke kiri & lingkarannya dirapatkan supaya kartu spesifikasi di kanan tidak tertutup */
-  const gap = wide ? Math.min(stage.clientWidth * 0.36, 280) : Math.min(stage.clientWidth * 0.36, 400);
-  const shift = wide ? Math.min(205, stage.clientWidth * 0.135) : 0;   /* kursi & kartu spesifikasi digeser bersama supaya margin kiri = kanan */
+  const gap = wide ? Math.min(stage.clientWidth * 0.36, 340) : Math.min(stage.clientWidth * 0.36, 400);
+  const shift = wide ? Math.min(202, stage.clientWidth * 0.134) : 0;   /* kursi & kartu spesifikasi digeser bersama supaya margin kiri = kanan */
   document.documentElement.style.setProperty('--mshift', shift + 'px');
   const r = entry.phi * Math.PI / 180;
   const d = Math.cos(r), x = Math.sin(r) * gap - shift;
