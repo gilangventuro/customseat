@@ -41,7 +41,7 @@
 
 
   /* ---------- panel spesifikasi: muncul dari belakang kursi (gepeng -> mekar) ---------- */
-  .side{position:absolute;top:50%;left:calc(50% + 507px - var(--mshift,110px));width:min(340px,calc(50vw - 527px + var(--mshift,110px)));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
+  .side{position:absolute;top:50%;left:calc(50% + var(--mpk,360px) - var(--mshift,110px));width:min(340px,calc(50vw - var(--mpk,360px) - 20px + var(--mshift,110px)));transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:stretch;gap:18px}
   .specs{pointer-events:none;
     transform-origin:0 50%;transform:translateX(-190px) scale(.03,.42);opacity:0;
     transition:transform .1s ease-in,opacity .1s ease-in;
@@ -120,14 +120,6 @@ const MODELS = [
   },
   {
     id: "kursi-twinseat-b", pickId: "kursi-twinseat",
-    name: "Twin Captain Seat",
-    desc: "Dari hasil scan 3D — detail jahitan & list asli, warna kulit bisa diganti.",
-    file: "assets/twin-seat-meshy.glb",
-    dummy: false,
-    target: "dummy-kursi-twinseat.html",
-  },
-  {
-    id: "kursi-twinseat-c", pickId: "kursi-twinseat",
     name: "Twin Captain Seat",
     desc: "Dari hasil scan 3D — detail jahitan & list asli, warna kulit bisa diganti.",
     file: "assets/twin-seat-meshy.glb",
@@ -288,12 +280,13 @@ window.addEventListener('resize', () => cards.forEach(resizeViewer));
 /* ---------- carousel orbit: kursi lama berputar ke belakang lalu berhenti di sisi kiri (blur) ---------- */
 const PHI_FRONT = 0;
 /* kursi tersusun melingkar: yang di tengah menghadap depan, sisanya tersebar rata di sekeliling (2 kursi -> 180, 3 kursi -> 120 & 240) */
-const goalPhi = i => (((i - centerIndex) % cards.length) + cards.length) % cards.length * 360 / cards.length;
+const goalPhi = i => { const n = cards.length, d = ((i - centerIndex) % n + n) % n; return d === 0 ? PHI_FRONT : (n === 2 ? 270 : d * 360 / n); };
 function poseCard(entry){
   const wide = !matchMedia('(max-width:1100px)').matches;   /* desktop: kursi digeser ke kiri & lingkarannya dirapatkan supaya kartu spesifikasi di kanan tidak tertutup */
-  const gap = wide ? Math.min(stage.clientWidth * 0.36, 340) : Math.min(stage.clientWidth * 0.36, 400);
-  const shift = wide ? Math.min(202, stage.clientWidth * 0.134) : 0;   /* kursi & kartu spesifikasi digeser bersama supaya margin kiri = kanan */
+  const gap = wide ? Math.min(stage.clientWidth * 0.36, cards.length === 2 ? 300 : 340) : Math.min(stage.clientWidth * 0.36, 400);
+  const shift = wide ? (cards.length === 2 ? Math.min(120, stage.clientWidth * 0.08) : Math.min(202, stage.clientWidth * 0.134)) : 0;   /* kursi & kartu spesifikasi digeser bersama supaya margin kiri = kanan */
   document.documentElement.style.setProperty('--mshift', shift + 'px');
+  document.documentElement.style.setProperty('--mpk', (cards.length === 2 ? 360 : 507) + 'px');
   const r = entry.phi * Math.PI / 180;
   const d = Math.cos(r), x = Math.sin(r) * gap - shift;
   const scale = d >= 0 ? 0.68 + 0.32 * d : 0.68 + 0.14 * d;
