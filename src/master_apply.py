@@ -45,10 +45,10 @@ def mk(name,col,met,rough):
     out=nt.nodes.new('ShaderNodeOutputMaterial'); bs=nt.nodes.new('ShaderNodeBsdfPrincipled')
     bs.inputs['Base Color'].default_value=(col[0],col[1],col[2],1); bs.inputs['Metallic'].default_value=met; bs.inputs['Roughness'].default_value=rough
     nt.links.new(bs.outputs['BSDF'],out.inputs['Surface']); m.diffuse_color=(col[0],col[1],col[2],1); return m
-LEATHER={'Body Utama':'leather_main','Boddy Dalam':'leather_pattern','List Aksen':'leather_accent','defaultplastic.001':'leather_stitch','Jahitan':'leather_stitch',
+LEATHER={'Body Utama':'leather_main','Boddy Dalam':'leather_pattern','List Aksen':'leather_accent','defaultplastic.001':'leather_stitch','Jahitan':'leather_thread',
          'Kulit Utama':'leather_main','Kulit Utama.001':'leather_main','kulit dalam':'leather_pattern','kulit dalam.001':'leather_pattern','kulit dalam.002':'leather_pattern',
          'Kulit Luar':'leather_main','Kulit Luar.001':'leather_main','list':'leather_accent','list.001':'leather_accent'}   # badan + bantalan footrest
-MATDEF={'leather_main':((0.045,0.046,0.05),0.0,0.55),'leather_pattern':((0.045,0.046,0.05),0.0,0.55),'leather_accent':((0.02,0.40,0.075),0.0,0.5),'leather_stitch':((0.03,0.032,0.036),0.0,0.55),
+MATDEF={'leather_main':((0.045,0.046,0.05),0.0,0.55),'leather_pattern':((0.045,0.046,0.05),0.0,0.55),'leather_accent':((0.02,0.40,0.075),0.0,0.5),'leather_stitch':((0.03,0.032,0.036),0.0,0.55),'leather_thread':((0.62,0.64,0.67),0.0,0.5),
         'plastik_hitam':((0.025,0.025,0.028),0.0,0.5),'plastik_abu':((0.2,0.2,0.2),0.0,0.5),'pad_hitam':((0.045,0.045,0.047),0.0,0.6),
         'part_handle':((0.025,0.025,0.028),0.0,0.45),'part_cupholder':((0.025,0.025,0.028),0.0,0.5),
         'baja':((0.5,0.5,0.5),1.0,0.25),'aluminium':((0.55,0.56,0.58),1.0,0.4),'tuas_merah':((0.6,0.03,0.02),0.0,0.45)}
@@ -73,7 +73,7 @@ def remap_mats(o,onbody=False,force=None):
     me=o.data; old=list(me.materials) or [None]; cats=[cat(m,onbody) for m in old]
     mi=np.empty(len(me.polygons),np.int32); me.polygons.foreach_get('material_index',mi); mi=np.clip(mi,0,len(old)-1)
     if onbody:
-        order=['leather_main','leather_pattern','leather_accent','leather_stitch']
+        order=['leather_main','leather_pattern','leather_accent','leather_stitch','leather_thread']
         used=[c for c in order if any(cats[i]==c and (mi==i).any() for i in range(len(old)))]
     else: used=list(dict.fromkeys(cats))
     new=np.array([used.index(c) if c in used else 0 for c in cats],np.int32)
