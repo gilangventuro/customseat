@@ -168,7 +168,7 @@ dracoLoader.setDecoderPath('https://unpkg.com/three@0.160.0/examples/jsm/libs/dr
 gltfLoader.setDRACOLoader(dracoLoader);
 
 /* warna bawaan Twin Captain Seat (sama dengan halaman edit) */
-const DEFAULT_COLORS = {leather_main:'#1b1c1f', leather_pattern:'#3a3e44', leather_accent:'#1f5557', part_handle:'#1b1c1f', part_cupholder:'#1b1c1f', leather_thread:'#a0a4aa'};
+const DEFAULT_COLORS = {leather_main:'#1b1c1f', leather_pattern:'#3a3e44', leather_accent:'#1f5557', part_handle:'#1b1c1f', part_cupholder:'#1b1c1f'};
 function getBaseModel(file, stripMaterials){
   if (sharedModels[file]) return sharedModels[file].promise;
   const isGltf = /\.(glb|gltf)$/i.test(file);

@@ -374,8 +374,6 @@ const PARTS3D = [
     mat:['leather_accent'], pal:LEATHER},
   {key:'stitch',  label:'Warna Jahitan', desc:'Benang jahitan dobel pada alur panel kiri-kanan',
     mat:['leather_stitch'], pal:LEATHER},
-  {key:'thread', label:'Jahitan Tegas', desc:'Garis jahitan tegas mengikuti alur cekungan panel',
-    mat:['leather_thread'], pal:LEATHER},
   {key:'handle',  label:'Handle Sandaran', desc:'Pegangan di bagian atas cangkang belakang kiri-kanan',
     mat:['part_handle'], pal:LEATHER},
   {key:'cupholder', label:'Cup Holder', desc:'Tempat gelas di cangkang belakang kiri-kanan',
@@ -386,7 +384,7 @@ const PARTS3D = [
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
 /* warna bawaan kursi: kulit utama hitam, motif abu-slate, list aksen teal, handle & cup holder hitam */
-const DEFAULT_COLORS = {main:'#1b1c1f', pattern:'#3a3e44', accent:'#1f5557', handle:'#1b1c1f', cupholder:'#1b1c1f', thread:'#a0a4aa'};
+const DEFAULT_COLORS = {main:'#1b1c1f', pattern:'#3a3e44', accent:'#1f5557', handle:'#1b1c1f', cupholder:'#1b1c1f'};
 
 const allPal = [...LEATHER];
 const nameOf = (hex, pal) => { if(!hex) return 'Warna asli'; const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase()); return f?f[0]:'Custom'; };
@@ -725,7 +723,7 @@ function greyWoodTex(src){
   t.flipY = src.flipY; t.colorSpace = src.colorSpace; t.wrapS = src.wrapS; t.wrapT = src.wrapT; t.anisotropy = src.anisotropy; t.channel = src.channel;
   greyCache.set(src, t); return t;
 }
-loader.load('assets/twin-seat-meshy.glb?v=20261120a',
+loader.load('assets/twin-seat-meshy.glb?v=20261119g',
   gltf => {
     model = gltf.scene;
 
