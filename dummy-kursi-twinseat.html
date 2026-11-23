@@ -759,6 +759,7 @@ loader.load('assets/twin-seat-meshy.glb?v=20261123a',
       const mats = Array.isArray(n.material) ? n.material : [n.material];
       mats.forEach(m => { m.side = THREE.DoubleSide; });
       if (mats.some(m => STRIP_MATERIALS.includes(m.name))) toStrip.push(n);
+      if (/^Rangka_Lain_(0[1-9]|1[01])$/.test(n.name)) toStrip.push(n);   /* rangka kantung lama di sandaran kiri: dibuang, diganti jaring baru */
     });
     toStrip.forEach(n => n.parent && n.parent.remove(n));
 
