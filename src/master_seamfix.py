@@ -70,7 +70,7 @@ def repair(body):
     inb=np.where((dseg<HALF)&(t>0.0)&(t<1.0))[0]
     # bobot sepanjang lintasan (0 di ujung utuh, 1 di tengah) x bobot melintang (1 di alur, 0 di tepi pita)
     sm=lambda x: x*x*(3-2*x)
-    wl=sm(np.clip(t/0.2,0,1))*sm(np.clip((1-t)/0.10,0,1))
+    wl=sm(np.clip(t/0.2,0,1))*sm(np.clip((1-t)/0.04,0,1))
     wc=sm(np.clip((HALF-dseg)/(HALF*0.5),0,1))
     # permukaan terlipat (face terbalik / serpihan) di sekitar lintasan: vertexnya ikut diratakan penuh
     nb_all=[[u.index for e in v.link_edges for u in [e.other_vert(v)]] for v in bm.verts] if False else None
@@ -93,6 +93,14 @@ def repair(body):
         for i,v in enumerate(inb): N[v]=Q[v]*(1-w[i])+Q[nb[i]].mean(0)*w[i]
         Q=N
     # 3) alur: Gaussian ke arah dalam (melawan normal), penuh di lintasan
+    # posisi lateral dihitung ulang dari titik yang sudah dihaluskan (Q), supaya tepi alur tidak bergelombang oleh noise mesh asli
+    dq,tq,bq=_band(Q[inb],path); sgm=seg[bq]; tgq=sgm/np.linalg.norm(sgm,axis=1)[:,None]
+    qq=path[bq]+np.clip(((Q[inb]-path[bq])*sgm).sum(1)/(sgm**2).sum(1),0,1)[:,None]*sgm
+    rq=Q[inb]-qq; rq=rq-(rq*nrm[inb]).sum(1)[:,None]*nrm[inb]
+    ldq=np.cross(-tgq,nrm[inb]); ldq/=np.linalg.norm(ldq,axis=1)[:,None]+1e-12
+    sgq=(rq*ldq).sum(1); offq=np.interp(tq,[0,0.2,1],[OFF0,0.018,OFF1])
+    lat=lat.copy(); lat2=lat2.copy(); sg=sg.copy(); off=off.copy()
+    sg[inb]=sgq; off[inb]=offq; lat[inb]=np.abs(sgq); lat2[inb]=np.abs(sgq-offq)
     prof=(DEPTH*np.exp(-(lat[inb]/SIGMA)**2)+DEPTH2*np.exp(-(lat2[inb]/SIGMA2)**2)-BEAD*np.exp(-((sg[inb]-off[inb]/2)/(off[inb]*0.3))**2))*wl[inb]
     new=Q[inb]-nrm[inb]*prof[:,None]
     for i,v in enumerate(inb): bm.verts[v].co=mathutils.Vector(new[i])
@@ -104,3 +112,24 @@ def repair(body):
             if all(near[v.index] for v in f.verts): f.material_index=sidx
     print('seamfix: pita',len(inb),'vertex; total vertex',len(bm.verts))
     bm.to_mesh(me); bm.free(); me.update()
+
+
+def despike(body,thr=0.25,k=0.8,iters=5):
+    """Duri/bintil kecil di sepanjang jahitan (noise mesh Meshy): titik yang menyimpang dari rata-rata tetangganya
+    melawan normalnya lebih dari thr x panjang sisi rata-rata digeser k bagian ke rata-rata itu. Titik lain tidak disentuh."""
+    me=body.data; n=len(me.vertices)
+    co=np.empty(n*3); me.vertices.foreach_get('co',co); co=co.reshape(-1,3)
+    ed=np.empty(len(me.edges)*2,int); me.edges.foreach_get('vertices',ed); ed=ed.reshape(-1,2)
+    tot=0
+    for _ in range(iters):
+        nr=np.empty(n*3); me.vertices.foreach_get('normal',nr); nr=nr.reshape(-1,3)
+        a,b=ed[:,0],ed[:,1]
+        acc=np.zeros((n,3)); cnt=np.zeros(n); el=np.zeros(n)
+        np.add.at(acc,a,co[b]); np.add.at(acc,b,co[a]); np.add.at(cnt,a,1); np.add.at(cnt,b,1)
+        L=np.linalg.norm(co[a]-co[b],axis=1); np.add.at(el,a,L); np.add.at(el,b,L)
+        cen=acc/np.maximum(cnt,1)[:,None]; el/=np.maximum(cnt,1)
+        dv=cen-co; s=(dv*nr).sum(1)
+        sp=(np.abs(s)>thr*el)&(cnt>2)
+        co[sp]+=dv[sp]*k; tot+=int(sp.sum())
+        me.vertices.foreach_set('co',co.ravel()); me.update()
+    print('despike: titik duri dihaluskan',tot)
