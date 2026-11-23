@@ -13,8 +13,8 @@ SEATS = [('Sandaran_Belakang_Kanan_02', 'Kanan', 0.516, 1.157),
 BW, BH = 0.70, 0.27          # jarak baut (lebar x tinggi)
 PAD = 0.11                   # bantalan persegi di tiap sudut (menutup bundaran baut di cangkang)
 BAND = 0.03                  # lebar pita bingkai
-FRAME_TOP, FRAME_T = 0.013, 0.012   # tinggi permukaan atas bingkai dari cangkang, tebal bingkai
-NET_D0, NET_BULGE = 0.005, 0.024    # jaring: tinggi di tepi, tonjolan maksimum di tengah
+STRIP_TOP, STRIP_T = 0.010, 0.006   # tinggi permukaan atas strip dari cangkang, tebal strip
+NET_D0, NET_BULGE = 0.004, 0.030    # jaring: tinggi di tepi, tonjolan maksimum di tengah
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC)
@@ -25,7 +25,7 @@ def mat(name, col, rough):
     b = m.node_tree.nodes['Principled BSDF']; b.inputs['Base Color'].default_value = col; b.inputs['Roughness'].default_value = rough
     return m
 M_NET = mat('net_mesh', (0.04, 0.045, 0.05, 1), 0.9)
-M_FRAME = mat('net_frame', (0.02, 0.022, 0.025, 1), 0.8)
+M_FRAME = mat('net_frame', (0.075, 0.08, 0.085, 1), 0.55)
 
 def make_surface(shell, cx, cz):
     """permukaan belakang cangkang di sekitar kantung: y = f(x,z) (polinom orde 2, lubang baut diabaikan) + normalnya"""
@@ -69,7 +69,7 @@ for shell_name, side, cx, cz in SEATS:
     Wo, Ho = BW + 0.05, BH + 0.05           # ukuran luar bingkai
     Wi, Hi = Wo - 2*BAND, Ho - 2*BAND       # ukuran dalam (jendela jaring)
     # ---- jaring ----
-    nu, nv = 70, 28; Wn, Hn = Wi + 0.008, Hi + 0.008
+    nu, nv = 70, 30; Wn, Hn = BW + 0.012, BH + 0.03
     bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); grid = []
     for j in range(nv + 1):
         row = []
@@ -77,7 +77,7 @@ for shell_name, side, cx, cz in SEATS:
             u, v = i/nu, j/nv
             x = cx - Wn/2 + u*Wn; z = cz - Hn/2 + v*Hn
             ed = min(u, 1-u, v, 1-v)
-            bulge = NET_BULGE * (math.sin(math.pi*u)**0.6) * (math.sin(math.pi*v)**0.6)
+            bulge = NET_BULGE * (math.sin(math.pi*u)**0.5) * (math.sin(math.pi*v**0.7)**0.8)
             p, n = S(x, z); row.append(bm.verts.new(p + n*(NET_D0 + bulge)))
         grid.append(row)
     for j in range(nv):
@@ -87,24 +87,25 @@ for shell_name, side, cx, cz in SEATS:
                 l[uvl].uv = (a/nu*Wn, b/nv*Hn)      # UV dalam meter (tekstur jaring diulang di situs)
     orient_up(bm, S)
     built.append(new_obj('Jaring_%s_Net' % side, bm, M_NET))
-    # ---- bingkai + paku ----
-    bm = bmesh.new(); nx, nz = 76, 32; gr = []
-    for j in range(nz + 1):
-        row = []
-        for i in range(nx + 1):
-            x = cx - Wo/2 + i/nx*Wo; z = cz - Ho/2 + j/nz*Ho
-            p, n = S(x, z); row.append(bm.verts.new(p + n*FRAME_TOP))
-        gr.append(row)
-    fs = []
-    for j in range(nz):
-        for i in range(nx):
-            xc = cx - Wo/2 + (i + .5)/nx*Wo; zc = cz - Ho/2 + (j + .5)/nz*Ho
-            if abs(xc - cx) < Wi/2 and abs(zc - cz) < Hi/2:                   # jendela jaring, kecuali bantalan sudut penutup baut
-                if not any(abs(xc - (cx + sx*BW/2)) < PAD/2 and abs(zc - (cz + sz*BH/2)) < PAD/2 for sx in (-1, 1) for sz in (-1, 1)): continue
-            fs.append(bm.faces.new((gr[j][i], gr[j][i+1], gr[j+1][i+1], gr[j+1][i])))
-    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    # ---- dua strip vertikal di kiri-kanan (seperti foto referensi) + sekrup ----
+    bm = bmesh.new(); SW, SH = 0.05, BH + 0.07; nx, nz = 6, 40
+    for sx in (-1, 1):
+        gr = []
+        for j in range(nz + 1):
+            row = []
+            for i in range(nx + 1):
+                x = cx + sx*BW/2 - SW/2 + i/nx*SW; z = cz - SH/2 + j/nz*SH
+                p, n = S(x, z); row.append(bm.verts.new(p + n*STRIP_TOP))
+            gr.append(row)
+        for j in range(nz):
+            for i in range(nx): bm.faces.new((gr[j][i], gr[j][i+1], gr[j+1][i+1], gr[j+1][i]))
     orient_up(bm, S)
-    bmesh.ops.solidify(bm, geom=list(bm.faces), thickness=FRAME_T)
+    bmesh.ops.solidify(bm, geom=list(bm.faces), thickness=STRIP_T)
+    for sx in (-1, 1):
+        for dz in (-SH/2 + 0.025, 0.0, SH/2 - 0.025):
+            p, n = S(cx + sx*BW/2, cz + dz); c0 = p + n*(STRIP_TOP + 0.002)
+            r = bmesh.ops.create_cone(bm, cap_ends=True, segments=12, radius1=0.0075, radius2=0.0065, depth=0.004)
+            for v in r['verts']: v.co = Vector((v.co.x, v.co.z, v.co.y)) + c0
     bm.normal_update()
     built.append(new_obj('Jaring_%s_Bingkai' % side, bm, M_FRAME))
 
