@@ -135,6 +135,7 @@ def despike(body,thr=0.25,k=0.8,iters=5):
     print('despike: titik duri dihaluskan',tot)
 
 
+ISLE=400   # pulau material di bawah ukuran ini (face) yang dikelilingi panel motif dilebur ke panel
 def clean_thread(body,minf=30):
     """Bercak/serpihan kecil bermaterial benang (hasil scan) di sekitar jahitan tampak seperti kotoran pada warna terang.
     Kumpulan face benang < minf face dikembalikan ke material kulit tetangganya; garis jahitan yang utuh tidak disentuh."""
@@ -161,5 +162,41 @@ def clean_thread(body,minf=30):
         mi=max(cnt,key=cnt.get)
         for x in comp: x.material_index=mi
         fixed+=len(comp)
+    # benang yang menempel pada panel motif berlian ikut jadi material panel (kalau tidak, ia berwarna kulit utama dan tampak seperti pasir di panel gelap)
+    pat=next((i for i,m in enumerate(me.materials) if m and m.name=='Boddy Dalam'),None); moved=0
+    if pat is not None:
+        for f in bm.faces:
+            if f.material_index not in th: continue
+            c=[0,0]
+            for v in f.verts:
+                for g in v.link_faces:
+                    if g is f or g.material_index in th: continue
+                    c[g.material_index==pat]+=1
+            if c[1]>0 and c[1]>=c[0]*0.5: f.material_index=pat; moved+=1
+    # serpihan kulit utama / benang kecil yang terkurung di dalam panel motif (bercak terang di panel gelap) -> jadi panel
+    isl=0
+    if pat is not None:
+        seen2=[False]*len(bm.faces)
+        for f in bm.faces:
+            mi0=f.material_index
+            if mi0==pat or seen2[f.index] or me.materials[mi0] is None or me.materials[mi0].name=='List Aksen': continue
+            comp=[f]; seen2[f.index]=True; k=0
+            while k<len(comp):
+                for v in comp[k].verts:
+                    for g in v.link_faces:
+                        if g.material_index==mi0 and not seen2[g.index]: seen2[g.index]=True; comp.append(g)
+                k+=1
+            if len(comp)>=ISLE: continue
+            cs=set(id(x) for x in comp); tot=0; npat=0
+            for x in comp:
+                for v in x.verts:
+                    for g in v.link_faces:
+                        if id(g) in cs: continue
+                        tot+=1; npat+=(g.material_index==pat)
+            if tot and npat>=0.6*tot:
+                for x in comp: x.material_index=pat
+                isl+=len(comp)
+    print('clean_thread: serpihan terkurung di panel motif',isl)
+    print('clean_thread: face benang di tepi panel motif dipindah ke panel',moved)
     print('clean_thread: komponen',comps,'face benang kecil dikembalikan ke kulit',fixed)
     bm.to_mesh(me); bm.free(); me.update()
