@@ -580,6 +580,8 @@ const ACC = [
   {key:'footrest_kiri',  label:'Footrest Kiri',  match:'Footrest_Kiri',  kind:'foot'},
   {key:'footrest_kanan', label:'Footrest Kanan', match:'Footrest_Kanan', kind:'foot'},
   {key:'handrest_tengah', label:'Handrest Tengah', match:'Handrest_Tengah', kind:'mid'},
+  {key:'net_kiri',  label:'Kantung Jaring Kiri',  match:'Jaring_Kiri',  kind:'net'},
+  {key:'net_kanan', label:'Kantung Jaring Kanan', match:'Jaring_Kanan', kind:'net'},
 ];
 ACC.forEach(a => { a.nodes = []; a.base = []; a.dir = new THREE.Vector3(); a.target = 0; a.progress = 0; });
 function setupAccessories(){
@@ -593,6 +595,7 @@ function setupAccessories(){
     const c = box.getCenter(new THREE.Vector3());
     /* handrest keluar ke samping (sisi sesuai posisinya), footrest maju ke depan */
     if (a.kind==='mid') { a.dir.set(0, 0.3, 0.12); return; }
+    if (a.kind==='net') { a.dir.set(0, -0.02, -0.28); return; }   /* kantung jaring lepas ke arah belakang */
     a.dir.set(a.kind==='hand' ? Math.sign(c.x || 1)*0.32 : 0, a.kind==='hand' ? 0.03 : -0.02, a.kind==='foot' ? 0.48 : 0);
   });
 }
@@ -733,8 +736,19 @@ function greyWoodTex(src){
   t.flipY = src.flipY; t.colorSpace = src.colorSpace; t.wrapS = src.wrapS; t.wrapT = src.wrapT; t.anisotropy = src.anisotropy; t.channel = src.channel;
   greyCache.set(src, t); return t;
 }
+/* ---------- kantung jaring di cangkang belakang (assets/net-pocket.glb, dibuat src/make_net.py) ---------- */
+function makeNetTexture(){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const cx = cv.getContext('2d'); cx.strokeStyle = '#17181b'; cx.lineWidth = 7; cx.lineCap = 'square';
+  cx.beginPath();
+  [[0,32,32,0],[32,64,64,32],[0,32,32,64],[32,0,64,32],[-2,2,2,-2],[62,66,66,62],[-2,62,2,66],[62,-2,66,2]].forEach(l => { cx.moveTo(l[0],l[1]); cx.lineTo(l[2],l[3]); });
+  cx.stroke();
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1/0.016, 1/0.016); t.anisotropy = 8; return t;
+}
+const netPromise = loader.loadAsync('assets/net-pocket.glb?v=20261123a').catch(() => null);
 loader.load('assets/twin-seat-meshy.glb?v=20261123a',
-  gltf => {
+  async gltf => {
     model = gltf.scene;
 
     /* buang mesh lantai/backdrop raksasa bawaan file export (bukan bagian kursi) */
@@ -754,6 +768,15 @@ loader.load('assets/twin-seat-meshy.glb?v=20261123a',
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     model.position.sub(center);
+    const net = await netPromise;
+    if (net) {
+      const netMat = new THREE.MeshStandardMaterial({ map: makeNetTexture(), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.85, metalness: 0 });
+      net.scene.traverse(n => {
+        if (!n.isMesh) return;
+        if (n.name.endsWith('_Net')) n.material = netMat; else n.material.side = THREE.DoubleSide;
+      });
+      model.add(net.scene);
+    }
 
     const radius = Math.max(size.x, size.y, size.z) * 0.5 || 100;
     const dist = radius / Math.sin((camera.fov * Math.PI/180) / 2) * 1.36;
