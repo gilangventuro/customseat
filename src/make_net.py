@@ -13,8 +13,8 @@ SEATS = [('Sandaran_Belakang_Kanan_02', 'Kanan', 0.516, 1.157),
 BW, BH = 0.70, 0.27          # jarak baut (lebar x tinggi)
 PAD = 0.11                   # bantalan persegi di tiap sudut (menutup bundaran baut di cangkang)
 BAND = 0.03                  # lebar pita bingkai
-STRIP_TOP, STRIP_T = 0.009, 0.006   # tinggi permukaan atas strip dari cangkang, tebal strip
-NET_D0, NET_BULGE = 0.004, 0.010    # jaring: tinggi di tepi, tonjolan maksimum di tengah
+STRIP_TOP, STRIP_T = 0.016, 0.006   # tinggi permukaan atas strip dari cangkang, tebal strip
+NET_D0, NET_BULGE = 0.010, 0.014    # jaring: tinggi di tepi, tonjolan maksimum di tengah
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC)
@@ -77,7 +77,7 @@ for shell_name, side, cx, cz in SEATS:
             u, v = i/nu, j/nv
             x = cx - Wn/2 + u*Wn; z = cz - Hn/2 + v*Hn
             ed = min(u, 1-u, v, 1-v)
-            bulge = NET_BULGE * (math.sin(math.pi*u)**0.5) * (math.sin(math.pi*v**0.7)**0.8)
+            bulge = NET_BULGE * (math.sin(math.pi*u)**0.35) * (math.sin(math.pi*v)**0.5)
             p, n = S(x, z); row.append(bm.verts.new(p + n*(NET_D0 + bulge)))
         grid.append(row)
     for j in range(nv):
