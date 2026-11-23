@@ -133,3 +133,33 @@ def despike(body,thr=0.25,k=0.8,iters=5):
         co[sp]+=dv[sp]*k; tot+=int(sp.sum())
         me.vertices.foreach_set('co',co.ravel()); me.update()
     print('despike: titik duri dihaluskan',tot)
+
+
+def clean_thread(body,minf=30):
+    """Bercak/serpihan kecil bermaterial benang (hasil scan) di sekitar jahitan tampak seperti kotoran pada warna terang.
+    Kumpulan face benang < minf face dikembalikan ke material kulit tetangganya; garis jahitan yang utuh tidak disentuh."""
+    me=body.data; bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    th={i for i,m in enumerate(me.materials) if m and m.name in ('defaultplastic.001','Jahitan')}
+    isth=[f.material_index in th for f in bm.faces]
+    seen=[False]*len(bm.faces); fixed=0; comps=0
+    for f in bm.faces:
+        if not isth[f.index] or seen[f.index]: continue
+        comp=[f]; seen[f.index]=True; k=0
+        while k<len(comp):
+            for v in comp[k].verts:
+                for g in v.link_faces:
+                    if isth[g.index] and not seen[g.index]: seen[g.index]=True; comp.append(g)
+            k+=1
+        comps+=1
+        if len(comp)>=minf: continue
+        cnt={}
+        for x in comp:
+            for v in x.verts:
+                for g in v.link_faces:
+                    if not isth[g.index]: cnt[g.material_index]=cnt.get(g.material_index,0)+1
+        if not cnt: continue
+        mi=max(cnt,key=cnt.get)
+        for x in comp: x.material_index=mi
+        fixed+=len(comp)
+    print('clean_thread: komponen',comps,'face benang kecil dikembalikan ke kulit',fixed)
+    bm.to_mesh(me); bm.free(); me.update()

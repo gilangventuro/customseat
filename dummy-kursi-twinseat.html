@@ -632,7 +632,15 @@ function renderAcc(){
   el.querySelector('.acc-all').onclick = () => { const to = off===list.length ? 0 : 1; list.forEach(a => a.target = to); renderParts(); };
   partsEl.appendChild(el);
 }
-function update(){ renderParts(); }
+/* benang jahitan (fitur warnanya sementara dimatikan): ikut warna Kulit Utama sedikit lebih gelap, supaya garis jahitan tampak halus dan tidak seperti kotoran di warna terang */
+const threadMats = [];
+function syncThread(){
+  threadMats.forEach(m => {
+    if (state.c.main) m.color.set(state.c.main).multiplyScalar(0.72); else m.color.set(m.userData.origColor);
+    if (m.map) { m.map = null; m.needsUpdate = true; }
+  });
+}
+function update(){ syncThread(); renderParts(); }
 
 function selectPart(key){
   state.open = key;
@@ -772,6 +780,7 @@ loader.load('assets/twin-seat-meshy.glb?v=20261123a',
       if (!n.isMesh) return;
       const mats = Array.isArray(n.material) ? n.material : [n.material];
       mats.forEach(m => {
+        if (m.name === 'leather_stitch' && !threadMats.includes(m)) { m.userData.origColor = m.color.clone(); threadMats.push(m); }
         const p = findPartByMat(m.name);
         if (!p) return;
         if (DEFAULT_COLORS[p.key]) m.color.set(DEFAULT_COLORS[p.key]);   /* warna bawaan ("ASLI") */
