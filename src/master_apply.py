@@ -26,6 +26,7 @@ par={o.name:(o.parent.name if o.parent else None) for o in objs}
 for o in objs:
     M=o.matrix_world.copy()
     if o.data.users>1: o.data=o.data.copy()
+    if o.name.startswith('rev.3-HANDLE'): sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); import master_handlecap; master_handlecap.cap(o)   # lubang soket baut di ujung ganggang ditutup rata (koordinat lokal)
     o.parent=None; o.matrix_world=mathutils.Matrix.Identity(4)
     o.data.transform(M)
     if M.determinant()<0: o.data.flip_normals()
