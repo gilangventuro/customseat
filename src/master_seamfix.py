@@ -8,11 +8,11 @@ import bmesh, numpy as np, mathutils
 # Alur di bagian bawah memang sudah samar di master; ikut diperjelas supaya garisnya menerus sampai bawah blok.
 PTS=np.array([(1.1367,-1.9092,0.9201),(1.1300,-1.8968,0.8315),(1.1028,-1.8747,0.7455)])
 TS=np.array([(-0.096*0.9,-0.129*0.9,-1.0),(-0.237,0.18,-1.0)])   # arah singgung ujung atas & bawah (turun)
-HALF=0.016      # setengah lebar pita yang diproses (m)
+HALF=0.035      # setengah lebar pita yang diproses (m)
 DEPTH=0.0065    # kedalaman alur terhadap permukaan rata (m); alur utuh di sekitarnya 2.5-8 mm
 SIGMA=0.0046    # lebar Gaussian alur (m)
-OFF0=0.015; OFF1=0.009   # jarak alur kedua (jahitan ganda) dari alur utama: di ujung atas -> ujung bawah (m)
-DEPTH2=0.0042; SIGMA2=0.0038
+OFF0=0.024; OFF1=0.017   # jarak alur kedua (jahitan ganda) dari alur utama: di ujung atas -> ujung bawah (m)
+BEAD=0.0045; DEPTH2=0.0042; SIGMA2=0.0038
 MAXEDGE=0.0025  # rapatkan mesh di pita sampai sisi terpanjang <= ini
 
 def _path(n=120):
@@ -52,6 +52,14 @@ def repair(body):
     bm.verts.ensure_lookup_table(); bm.normal_update()
     co=np.array([v.co[:] for v in bm.verts]); nrm=np.array([v.normal[:] for v in bm.verts])
     d,t,bi=_band(co,path);
+    reg=np.where(d<0.05)[0]; regset=set(reg.tolist())
+    ns=nrm.copy()
+    nbr={int(v):[u.index for e in bm.verts[int(v)].link_edges for u in [e.other_vert(bm.verts[int(v)])]] for v in reg}
+    for _ in range(14):
+        prev=ns.copy()
+        for v in reg: ns[v]=prev[nbr[int(v)]+[int(v)]].mean(0)
+        ns/=np.linalg.norm(ns,axis=1)[:,None]+1e-12
+    nrm_raw=nrm; nrm=ns   # normal dihaluskan: alur tidak ikut bergelombang oleh noise mesh asli
     # lateral = jarak ke lintasan pada bidang singgung permukaan
     seg=path[1:]-path[:-1]; tang=seg[bi]/np.linalg.norm(seg[bi],axis=1)[:,None]
     q=path[bi]+np.clip(((co-path[bi])*seg[bi]).sum(1)/(seg[bi]**2).sum(1),0,1)[:,None]*seg[bi]
@@ -62,16 +70,10 @@ def repair(body):
     inb=np.where((dseg<HALF)&(t>0.0)&(t<1.0))[0]
     # bobot sepanjang lintasan (0 di ujung utuh, 1 di tengah) x bobot melintang (1 di alur, 0 di tepi pita)
     sm=lambda x: x*x*(3-2*x)
-    wl=sm(np.clip(t/0.10,0,1))*sm(np.clip((1-t)/0.10,0,1))
+    wl=sm(np.clip(t/0.16,0,1))*sm(np.clip((1-t)/0.10,0,1))
     wc=sm(np.clip((HALF-dseg)/(HALF*0.5),0,1))
     # permukaan terlipat (face terbalik / serpihan) di sekitar lintasan: vertexnya ikut diratakan penuh
     nb_all=[[u.index for e in v.link_edges for u in [e.other_vert(v)]] for v in bm.verts] if False else None
-    reg=np.where(d<0.05)[0]; regset=set(reg.tolist())
-    ns=nrm.copy()
-    for _ in range(3):
-        for v in reg:
-            ns[v]=nrm[[u.index for e in bm.verts[v].link_edges for u in [e.other_vert(bm.verts[v])]]].mean(0)
-        ns/=np.linalg.norm(ns,axis=1)[:,None]+1e-12
     fix=set()
     for v in reg:
         for f in bm.verts[v].link_faces:
@@ -86,12 +88,12 @@ def repair(body):
     idx={int(v):i for i,v in enumerate(inb)}
     nb=[[u.index for e in bm.verts[v].link_edges for u in [e.other_vert(bm.verts[v])]] for v in inb]
     Q=co.copy()
-    for _ in range(12):
+    for _ in range(100):
         N=Q.copy()
         for i,v in enumerate(inb): N[v]=Q[v]*(1-w[i])+Q[nb[i]].mean(0)*w[i]
         Q=N
     # 3) alur: Gaussian ke arah dalam (melawan normal), penuh di lintasan
-    prof=(DEPTH*np.exp(-(lat[inb]/SIGMA)**2)+DEPTH2*np.exp(-(lat2[inb]/SIGMA2)**2))*wl[inb]
+    prof=(DEPTH*np.exp(-(lat[inb]/SIGMA)**2)+DEPTH2*np.exp(-(lat2[inb]/SIGMA2)**2)-BEAD*np.exp(-((sg[inb]-off[inb]/2)/(off[inb]*0.3))**2))*wl[inb]
     new=Q[inb]-nrm[inb]*prof[:,None]
     for i,v in enumerate(inb): bm.verts[v].co=mathutils.Vector(new[i])
     # 4) garis jahitan: face di dasar alur diberi material benang (seperti di bagian jahitan yang utuh)
