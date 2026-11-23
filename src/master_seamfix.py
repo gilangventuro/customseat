@@ -4,20 +4,27 @@
 # Dipanggil dari master_apply.py sebelum decimate. Idempotent terhadap master lain: kalau geometri di titik itu tidak ada, tidak berbuat apa-apa.
 import bmesh, numpy as np, mathutils
 
-# ujung atas & bawah alur yang masih utuh + arah singgungnya (turun) -> lintasan Hermite
-E0=np.array((1.1367,-1.9092,0.9201)); E1=np.array((1.1300,-1.8968,0.8315))
-T0=np.array((0.096*0.9,0.129*0.9,1.0)); T0[2]=1.0; T0=-T0   # (dx,dy,dz) per satuan z, arah turun
-T1=np.array((0.237,0.18,1.0)); T1=-T1
+# titik-titik lintasan alur (dunia Blender, dari atas ke bawah): ujung atas yang utuh, tengah (di dekat ujung bawah celah), dan bawah.
+# Alur di bagian bawah memang sudah samar di master; ikut diperjelas supaya garisnya menerus sampai bawah blok.
+PTS=np.array([(1.1367,-1.9092,0.9201),(1.1300,-1.8968,0.8315),(1.1028,-1.8747,0.7455)])
+TS=np.array([(-0.096*0.9,-0.129*0.9,-1.0),(-0.237,0.18,-1.0)])   # arah singgung ujung atas & bawah (turun)
 HALF=0.016      # setengah lebar pita yang diproses (m)
 DEPTH=0.0065    # kedalaman alur terhadap permukaan rata (m); alur utuh di sekitarnya 2.5-8 mm
 SIGMA=0.0046    # lebar Gaussian alur (m)
+OFF0=0.015; OFF1=0.009   # jarak alur kedua (jahitan ganda) dari alur utama: di ujung atas -> ujung bawah (m)
+DEPTH2=0.0042; SIGMA2=0.0038
 MAXEDGE=0.0025  # rapatkan mesh di pita sampai sisi terpanjang <= ini
 
-def _path(n=80):
-    L=np.linalg.norm(E1-E0); m0=T0/np.linalg.norm(T0)*L; m1=T1/np.linalg.norm(T1)*L
-    t=np.linspace(0,1,n)[:,None]
-    h00=2*t**3-3*t**2+1; h10=t**3-2*t**2+t; h01=-2*t**3+3*t**2; h11=t**3-t**2
-    return h00*E0+h10*m0+h01*E1+h11*m1
+def _path(n=120):
+    P=PTS; T=[TS[0]/np.linalg.norm(TS[0])*np.linalg.norm(P[1]-P[0])]
+    for i in range(1,len(P)-1): T.append((P[i+1]-P[i-1])/2)
+    T.append(TS[1]/np.linalg.norm(TS[1])*np.linalg.norm(P[-1]-P[-2]))
+    out=[]
+    for i in range(len(P)-1):
+        t=np.linspace(0,1,n//(len(P)-1),endpoint=(i==len(P)-2))[:,None]
+        h00=2*t**3-3*t**2+1; h10=t**3-2*t**2+t; h01=-2*t**3+3*t**2; h11=t**3-t**2
+        out.append(h00*P[i]+h10*T[i]+h01*P[i+1]+h11*T[i+1])
+    return np.concatenate(out)
 
 def _band(P,path,extra=0.0):
     """untuk tiap titik: (jarak ke lintasan, parameter t di lintasan, titik terdekat)"""
@@ -37,7 +44,7 @@ def repair(body):
     for _ in range(4):
         bm.verts.ensure_lookup_table(); bm.edges.ensure_lookup_table()
         co=np.array([v.co[:] for v in bm.verts]); d,t,_=_band(co,path)
-        inb=(d<HALF*1.3)&(t>-0.02)&(t<1.02)
+        inb=(d<(HALF+OFF0)*1.2)&(t>-0.02)&(t<1.02)
         ed=[e for e in bm.edges if (inb[e.verts[0].index] or inb[e.verts[1].index]) and e.calc_length()>MAXEDGE]
         if not ed: break
         bmesh.ops.subdivide_edges(bm,edges=ed,cuts=1,use_grid_fill=True)
@@ -48,29 +55,49 @@ def repair(body):
     # lateral = jarak ke lintasan pada bidang singgung permukaan
     seg=path[1:]-path[:-1]; tang=seg[bi]/np.linalg.norm(seg[bi],axis=1)[:,None]
     q=path[bi]+np.clip(((co-path[bi])*seg[bi]).sum(1)/(seg[bi]**2).sum(1),0,1)[:,None]*seg[bi]
-    r=co-q; r=r-(r*nrm).sum(1)[:,None]*nrm; lat=np.linalg.norm(r,axis=1)
-    inb=np.where((lat<HALF)&(t>0.0)&(t<1.0))[0]
+    r=co-q; r=r-(r*nrm).sum(1)[:,None]*nrm
+    ld=np.cross(-tang,nrm); ld/=np.linalg.norm(ld,axis=1)[:,None]+1e-12
+    sg=(r*ld).sum(1); off=OFF0+(OFF1-OFF0)*t           # sg>0 = sisi tempat alur kedua
+    lat=np.abs(sg); lat2=np.abs(sg-off); dseg=np.maximum(0,np.maximum(-sg,sg-off))
+    inb=np.where((dseg<HALF)&(t>0.0)&(t<1.0))[0]
     # bobot sepanjang lintasan (0 di ujung utuh, 1 di tengah) x bobot melintang (1 di alur, 0 di tepi pita)
     sm=lambda x: x*x*(3-2*x)
-    wl=sm(np.clip(t/0.18,0,1))*sm(np.clip((1-t)/0.18,0,1))
-    wc=sm(np.clip((HALF-lat)/(HALF*0.5),0,1))
-    w=(wl*wc)[inb]
+    wl=sm(np.clip(t/0.10,0,1))*sm(np.clip((1-t)/0.10,0,1))
+    wc=sm(np.clip((HALF-dseg)/(HALF*0.5),0,1))
+    # permukaan terlipat (face terbalik / serpihan) di sekitar lintasan: vertexnya ikut diratakan penuh
+    nb_all=[[u.index for e in v.link_edges for u in [e.other_vert(v)]] for v in bm.verts] if False else None
+    reg=np.where(d<0.05)[0]; regset=set(reg.tolist())
+    ns=nrm.copy()
+    for _ in range(3):
+        for v in reg:
+            ns[v]=nrm[[u.index for e in bm.verts[v].link_edges for u in [e.other_vert(bm.verts[v])]]].mean(0)
+        ns/=np.linalg.norm(ns,axis=1)[:,None]+1e-12
+    fix=set()
+    for v in reg:
+        for f in bm.verts[v].link_faces:
+            if f.normal.dot(mathutils.Vector(ns[[x.index for x in f.verts]].mean(0)))<0.5:
+                for x in f.verts:
+                    fix.add(x.index)
+                    for e in x.link_edges: fix.add(e.other_vert(x).index)
+    fix=np.array(sorted(fix&regset),int); print('seamfix: vertex terlipat',len(fix))
+    wfull=wl*wc; wfull[fix]=1.0
+    inb=np.union1d(inb,fix); w=wfull[inb]
     # 2) ratakan kerusakan: Laplacian terbatas pada pita (bobot w)
     idx={int(v):i for i,v in enumerate(inb)}
     nb=[[u.index for e in bm.verts[v].link_edges for u in [e.other_vert(bm.verts[v])]] for v in inb]
     Q=co.copy()
-    for _ in range(8):
+    for _ in range(12):
         N=Q.copy()
         for i,v in enumerate(inb): N[v]=Q[v]*(1-w[i])+Q[nb[i]].mean(0)*w[i]
         Q=N
     # 3) alur: Gaussian ke arah dalam (melawan normal), penuh di lintasan
-    prof=DEPTH*np.exp(-(lat[inb]/SIGMA)**2)*wl[inb]
+    prof=(DEPTH*np.exp(-(lat[inb]/SIGMA)**2)+DEPTH2*np.exp(-(lat2[inb]/SIGMA2)**2))*wl[inb]
     new=Q[inb]-nrm[inb]*prof[:,None]
     for i,v in enumerate(inb): bm.verts[v].co=mathutils.Vector(new[i])
     # 4) garis jahitan: face di dasar alur diberi material benang (seperti di bagian jahitan yang utuh)
     sidx=next((i for i,m in enumerate(me.materials) if m and m.name=='defaultplastic.001'),None)
     if sidx is not None:
-        near=np.zeros(len(bm.verts),bool); near[inb[(lat[inb]<0.0022)&(wl[inb]>0.5)]]=True
+        near=np.zeros(len(bm.verts),bool); near[inb[((lat[inb]<0.0022)|(lat2[inb]<0.0022))&(wl[inb]>0.5)]]=True
         for f in bm.faces:
             if all(near[v.index] for v in f.verts): f.material_index=sidx
     print('seamfix: pita',len(inb),'vertex; total vertex',len(bm.verts))
