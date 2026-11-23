@@ -18,6 +18,10 @@ YCUT=float(env('FOOT_YCUT','-1.75'))      # bagian alas kaki: titik di depan gar
 
 # ---- 1) kumpulkan, catat induk, bake transformasi dunia ke mesh ----
 objs=[o for o in bpy.data.objects if o.type=='MESH']
+_b0=next(o for o in objs if o.name.startswith('Meshy_AI_Twin_Luxe_Seats'))   # satu badan saja; salinan kerja (.001/.002) & bola uji jahitan di file master tidak ikut diekspor
+_keep=[o for o in objs if o is _b0 or not (o.name.startswith('Meshy_AI_Twin_Luxe_Seats') or o.name.startswith('Icosphere'))]
+for _o in [o for o in objs if o not in _keep]: bpy.data.objects.remove(_o)
+objs=_keep
 par={o.name:(o.parent.name if o.parent else None) for o in objs}
 for o in objs:
     M=o.matrix_world.copy()
@@ -121,6 +125,7 @@ for o in objs:
     elif n=='Tuas': nm='Handrest_Kanan_Tuas'; r=1.0
     else: nm='Rangka_Lain'; r=1.0
     if any(m and 'walnut' in m.name for m in o.data.materials): r=max(r,float(env('WOOD_RATIO','0.4')))
+    if 'COVER AR' in n or 'KARET PENAHAN' in n: r=max(r,float(env('HANDCOVER_RATIO','0.6')))   # cover & karet armrest membawa logo Alldila + plat Alpha: jangan dipangkas keras
     ctr=bbox(o); cx=float((ctr[0][0]+ctr[1][0])/2)
     if nm.startswith(('Sandaran_Belakang','Handle','Cupholder')): nm+= '_Kiri' if cx<XC else '_Kanan'
     FORCE_OBJ[o.name]=FORCE.get(nm.rsplit('_',1)[0] if nm.endswith(('_Kiri','_Kanan')) else nm)
@@ -138,7 +143,14 @@ for o,nm,t,dl,onb in plan:
         md=o.modifiers.new('dec','DECIMATE'); md.ratio=max(ratio,0.005); md.delimit=dl
         if 'NORMAL' in dl: md.angle_limit=math.radians(25)
         bpy.ops.object.modifier_apply(modifier='dec')
-    for pl in o.data.polygons: pl.use_smooth=True
+    if nm.startswith('Handrest'):   # halus per sudut: tepi tajam (logo, lekuk cover) tetap tegas, bidang lengkung tetap mulus
+        bm_=bmesh.new(); bm_.from_mesh(o.data)
+        for e_ in bm_.edges:
+            if len(e_.link_faces)==2 and e_.calc_face_angle(0.0)>math.radians(40): e_.smooth=False
+        for f_ in bm_.faces: f_.smooth=True
+        bm_.to_mesh(o.data); bm_.free()
+    else:
+        for pl in o.data.polygons: pl.use_smooth=True
     while len(o.data.color_attributes): o.data.color_attributes.remove(o.data.color_attributes[0])   # warna vertex bawaan Meshy ikut mengalikan tint di three.js -> buang
     print('objek',nm,n0,'->',len(o.data.polygons),[m.name for m in o.data.materials])
 print('face akhir',sum(len(o.data.polygons) for o,_,_,_,_ in plan))
