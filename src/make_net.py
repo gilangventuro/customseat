@@ -13,8 +13,8 @@ SEATS = [('Sandaran_Belakang_Kanan_02', 'Kanan', 0.516, 1.157),
 BW, BH = 0.70, 0.27          # jarak baut (lebar x tinggi)
 PAD = 0.11                   # bantalan persegi di tiap sudut (menutup bundaran baut di cangkang)
 BAND = 0.03                  # lebar pita bingkai
-STRIP_TOP, STRIP_T = 0.010, 0.006   # tinggi permukaan atas strip dari cangkang, tebal strip
-NET_D0, NET_BULGE = 0.004, 0.030    # jaring: tinggi di tepi, tonjolan maksimum di tengah
+STRIP_TOP, STRIP_T = 0.009, 0.006   # tinggi permukaan atas strip dari cangkang, tebal strip
+NET_D0, NET_BULGE = 0.004, 0.010    # jaring: tinggi di tepi, tonjolan maksimum di tengah
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC)
@@ -25,7 +25,7 @@ def mat(name, col, rough):
     b = m.node_tree.nodes['Principled BSDF']; b.inputs['Base Color'].default_value = col; b.inputs['Roughness'].default_value = rough
     return m
 M_NET = mat('net_mesh', (0.04, 0.045, 0.05, 1), 0.9)
-M_FRAME = mat('net_frame', (0.075, 0.08, 0.085, 1), 0.55)
+M_FRAME = mat('net_frame', (0.012, 0.013, 0.015, 1), 0.7)
 
 def make_surface(shell, cx, cz):
     """permukaan belakang cangkang di sekitar kantung: y = f(x,z) (polinom orde 2, lubang baut diabaikan) + normalnya"""
@@ -88,7 +88,7 @@ for shell_name, side, cx, cz in SEATS:
     orient_up(bm, S)
     built.append(new_obj('Jaring_%s_Net' % side, bm, M_NET))
     # ---- dua strip vertikal di kiri-kanan (seperti foto referensi) + sekrup ----
-    bm = bmesh.new(); SW, SH = 0.05, BH + 0.07; nx, nz = 6, 40
+    bm = bmesh.new(); SW, SH = 0.05, BH + 0.03; nx, nz = 6, 40
     for sx in (-1, 1):
         gr = []
         for j in range(nz + 1):
