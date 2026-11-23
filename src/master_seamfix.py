@@ -135,7 +135,7 @@ def despike(body,thr=0.25,k=0.8,iters=5):
     print('despike: titik duri dihaluskan',tot)
 
 
-ISLE=400   # pulau material di bawah ukuran ini (face) yang dikelilingi panel motif dilebur ke panel
+ISLE=6000   # pulau material di bawah ukuran ini (face) yang dikelilingi panel motif dilebur ke panel
 def clean_thread(body,minf=30):
     """Bercak/serpihan kecil bermaterial benang (hasil scan) di sekitar jahitan tampak seperti kotoran pada warna terang.
     Kumpulan face benang < minf face dikembalikan ke material kulit tetangganya; garis jahitan yang utuh tidak disentuh."""
@@ -193,7 +193,7 @@ def clean_thread(body,minf=30):
                     for g in v.link_faces:
                         if id(g) in cs: continue
                         tot+=1; npat+=(g.material_index==pat)
-            if tot and npat>=0.6*tot:
+            if tot and npat>=0.7*tot:
                 for x in comp: x.material_index=pat
                 isl+=len(comp)
     print('clean_thread: serpihan terkurung di panel motif',isl)

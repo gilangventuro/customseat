@@ -11,8 +11,9 @@ SRC, OUT = sys.argv[-2], sys.argv[-1]
 SEATS = [('Sandaran_Belakang_Kanan_02', 'Kanan', 0.516, 1.157),
          ('Sandaran_Belakang_Kiri_02',  'Kiri', -0.854, 1.188)]
 BW, BH = 0.70, 0.27          # jarak baut (lebar x tinggi)
+PAD = 0.11                   # bantalan persegi di tiap sudut (menutup bundaran baut di cangkang)
 BAND = 0.03                  # lebar pita bingkai
-FRAME_TOP, FRAME_T = 0.009, 0.008   # tinggi permukaan atas bingkai dari cangkang, tebal bingkai
+FRAME_TOP, FRAME_T = 0.013, 0.012   # tinggi permukaan atas bingkai dari cangkang, tebal bingkai
 NET_D0, NET_BULGE = 0.005, 0.024    # jaring: tinggi di tepi, tonjolan maksimum di tengah
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -24,7 +25,7 @@ def mat(name, col, rough):
     b = m.node_tree.nodes['Principled BSDF']; b.inputs['Base Color'].default_value = col; b.inputs['Roughness'].default_value = rough
     return m
 M_NET = mat('net_mesh', (0.04, 0.045, 0.05, 1), 0.9)
-M_FRAME = mat('net_frame', (0.17, 0.18, 0.2, 1), 0.85)
+M_FRAME = mat('net_frame', (0.02, 0.022, 0.025, 1), 0.8)
 
 def make_surface(shell, cx, cz):
     """permukaan belakang cangkang di sekitar kantung: y = f(x,z) (polinom orde 2, lubang baut diabaikan) + normalnya"""
@@ -98,19 +99,13 @@ for shell_name, side, cx, cz in SEATS:
     for j in range(nz):
         for i in range(nx):
             xc = cx - Wo/2 + (i + .5)/nx*Wo; zc = cz - Ho/2 + (j + .5)/nz*Ho
-            if abs(xc - cx) < Wi/2 and abs(zc - cz) < Hi/2: continue      # jendela jaring
+            if abs(xc - cx) < Wi/2 and abs(zc - cz) < Hi/2:                   # jendela jaring, kecuali bantalan sudut penutup baut
+                if not any(abs(xc - (cx + sx*BW/2)) < PAD/2 and abs(zc - (cz + sz*BH/2)) < PAD/2 for sx in (-1, 1) for sz in (-1, 1)): continue
             fs.append(bm.faces.new((gr[j][i], gr[j][i+1], gr[j+1][i+1], gr[j+1][i])))
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
     orient_up(bm, S)
     bmesh.ops.solidify(bm, geom=list(bm.faces), thickness=FRAME_T)
     bm.normal_update()
-    # paku keling di empat baut
-    for sx in (-1, 1):
-        for sz in (-1, 1):
-            p, n = S(cx + sx*BW/2, cz + sz*BH/2)
-            r = bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=20, radius1=0.0115, radius2=0.0085, depth=0.005)
-            q = n.to_track_quat('Z', 'Y').to_matrix().to_4x4()
-            bmesh.ops.transform(bm, matrix=Matrix.Translation(p + n*(FRAME_TOP + 0.0025)) @ q, verts=r['verts'])
     built.append(new_obj('Jaring_%s_Bingkai' % side, bm, M_FRAME))
 
 for o in list(bpy.data.objects):
