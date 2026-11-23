@@ -6,12 +6,12 @@ import bmesh, numpy as np, mathutils
 
 # titik-titik lintasan alur (dunia Blender, dari atas ke bawah): ujung atas yang utuh, tengah (di dekat ujung bawah celah), dan bawah.
 # Alur di bagian bawah memang sudah samar di master; ikut diperjelas supaya garisnya menerus sampai bawah blok.
-PTS=np.array([(1.1367,-1.9092,0.9201),(1.1300,-1.8968,0.8315),(1.1028,-1.8747,0.7455)])
-TS=np.array([(-0.096*0.9,-0.129*0.9,-1.0),(-0.237,0.18,-1.0)])   # arah singgung ujung atas & bawah (turun)
+PTS=np.array([(1.1443,-1.9005,0.9700),(1.1367,-1.9092,0.9201),(1.1300,-1.8968,0.8315),(1.1028,-1.8747,0.7455)])
+TS=np.array([(-0.19,-0.26,-1.0),(-0.237,0.18,-1.0)])   # arah singgung ujung atas & bawah (turun)
 HALF=0.035      # setengah lebar pita yang diproses (m)
 DEPTH=0.0065    # kedalaman alur terhadap permukaan rata (m); alur utuh di sekitarnya 2.5-8 mm
 SIGMA=0.0046    # lebar Gaussian alur (m)
-OFF0=0.024; OFF1=0.017   # jarak alur kedua (jahitan ganda) dari alur utama: di ujung atas -> ujung bawah (m)
+OFF0=0.0225; OFF1=0.0165   # jarak alur kedua (jahitan ganda) dari alur utama: di ujung atas -> ujung bawah (m)
 BEAD=0.0045; DEPTH2=0.0042; SIGMA2=0.0038
 MAXEDGE=0.0025  # rapatkan mesh di pita sampai sisi terpanjang <= ini
 
@@ -65,12 +65,12 @@ def repair(body):
     q=path[bi]+np.clip(((co-path[bi])*seg[bi]).sum(1)/(seg[bi]**2).sum(1),0,1)[:,None]*seg[bi]
     r=co-q; r=r-(r*nrm).sum(1)[:,None]*nrm
     ld=np.cross(-tang,nrm); ld/=np.linalg.norm(ld,axis=1)[:,None]+1e-12
-    sg=(r*ld).sum(1); off=OFF0+(OFF1-OFF0)*t           # sg>0 = sisi tempat alur kedua
+    sg=(r*ld).sum(1); off=np.interp(t,[0,0.2,1],[OFF0,0.018,OFF1])           # sg>0 = sisi tempat alur kedua
     lat=np.abs(sg); lat2=np.abs(sg-off); dseg=np.maximum(0,np.maximum(-sg,sg-off))
     inb=np.where((dseg<HALF)&(t>0.0)&(t<1.0))[0]
     # bobot sepanjang lintasan (0 di ujung utuh, 1 di tengah) x bobot melintang (1 di alur, 0 di tepi pita)
     sm=lambda x: x*x*(3-2*x)
-    wl=sm(np.clip(t/0.16,0,1))*sm(np.clip((1-t)/0.10,0,1))
+    wl=sm(np.clip(t/0.2,0,1))*sm(np.clip((1-t)/0.10,0,1))
     wc=sm(np.clip((HALF-dseg)/(HALF*0.5),0,1))
     # permukaan terlipat (face terbalik / serpihan) di sekitar lintasan: vertexnya ikut diratakan penuh
     nb_all=[[u.index for e in v.link_edges for u in [e.other_vert(v)]] for v in bm.verts] if False else None
