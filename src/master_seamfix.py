@@ -1,0 +1,77 @@
+# Perbaikan lokal badan twin seat: garis jahitan (alur pembatas) di ujung blok kulit kanan-depan putus ~9 cm
+# (mesh Meshy-nya rusak/berantakan di situ). Alur dibangun ulang mengikuti lintasan antara dua ujung yang masih utuh,
+# memakai profil alur yang diukur dari bagian jahitan yang utuh. Koordinat = dunia Blender (mesh sudah di-bake).
+# Dipanggil dari master_apply.py sebelum decimate. Idempotent terhadap master lain: kalau geometri di titik itu tidak ada, tidak berbuat apa-apa.
+import bmesh, numpy as np, mathutils
+
+# ujung atas & bawah alur yang masih utuh + arah singgungnya (turun) -> lintasan Hermite
+E0=np.array((1.1367,-1.9092,0.9201)); E1=np.array((1.1300,-1.8968,0.8315))
+T0=np.array((0.096*0.9,0.129*0.9,1.0)); T0[2]=1.0; T0=-T0   # (dx,dy,dz) per satuan z, arah turun
+T1=np.array((0.237,0.18,1.0)); T1=-T1
+HALF=0.016      # setengah lebar pita yang diproses (m)
+DEPTH=0.0065    # kedalaman alur terhadap permukaan rata (m); alur utuh di sekitarnya 2.5-8 mm
+SIGMA=0.0046    # lebar Gaussian alur (m)
+MAXEDGE=0.0025  # rapatkan mesh di pita sampai sisi terpanjang <= ini
+
+def _path(n=80):
+    L=np.linalg.norm(E1-E0); m0=T0/np.linalg.norm(T0)*L; m1=T1/np.linalg.norm(T1)*L
+    t=np.linspace(0,1,n)[:,None]
+    h00=2*t**3-3*t**2+1; h10=t**3-2*t**2+t; h01=-2*t**3+3*t**2; h11=t**3-t**2
+    return h00*E0+h10*m0+h01*E1+h11*m1
+
+def _band(P,path,extra=0.0):
+    """untuk tiap titik: (jarak ke lintasan, parameter t di lintasan, titik terdekat)"""
+    seg=path[1:]-path[:-1]; sl=(seg**2).sum(1)
+    best=np.full(len(P),9.0); bt=np.zeros(len(P)); bi=np.zeros(len(P),int)
+    for i in range(len(seg)):
+        w=np.clip(((P-path[i])@seg[i])/sl[i],0,1); q=path[i]+w[:,None]*seg[i]
+        d=np.linalg.norm(P-q,axis=1); m=d<best; best[m]=d[m]; bt[m]=(i+w[m])/len(seg); bi[m]=i
+    return best,bt,bi
+
+def repair(body):
+    me=body.data; bm=bmesh.new(); bm.from_mesh(me)
+    path=_path()
+    co=np.array([v.co[:] for v in bm.verts]); d,t,_=_band(co,path)
+    if (d<HALF).sum()<50: print('seamfix: geometri tidak ditemukan, lewati'); bm.free(); return
+    # 1) rapatkan mesh di pita
+    for _ in range(4):
+        bm.verts.ensure_lookup_table(); bm.edges.ensure_lookup_table()
+        co=np.array([v.co[:] for v in bm.verts]); d,t,_=_band(co,path)
+        inb=(d<HALF*1.3)&(t>-0.02)&(t<1.02)
+        ed=[e for e in bm.edges if (inb[e.verts[0].index] or inb[e.verts[1].index]) and e.calc_length()>MAXEDGE]
+        if not ed: break
+        bmesh.ops.subdivide_edges(bm,edges=ed,cuts=1,use_grid_fill=True)
+    bmesh.ops.triangulate(bm,faces=[f for f in bm.faces if len(f.verts)>3])
+    bm.verts.ensure_lookup_table(); bm.normal_update()
+    co=np.array([v.co[:] for v in bm.verts]); nrm=np.array([v.normal[:] for v in bm.verts])
+    d,t,bi=_band(co,path);
+    # lateral = jarak ke lintasan pada bidang singgung permukaan
+    seg=path[1:]-path[:-1]; tang=seg[bi]/np.linalg.norm(seg[bi],axis=1)[:,None]
+    q=path[bi]+np.clip(((co-path[bi])*seg[bi]).sum(1)/(seg[bi]**2).sum(1),0,1)[:,None]*seg[bi]
+    r=co-q; r=r-(r*nrm).sum(1)[:,None]*nrm; lat=np.linalg.norm(r,axis=1)
+    inb=np.where((lat<HALF)&(t>0.0)&(t<1.0))[0]
+    # bobot sepanjang lintasan (0 di ujung utuh, 1 di tengah) x bobot melintang (1 di alur, 0 di tepi pita)
+    sm=lambda x: x*x*(3-2*x)
+    wl=sm(np.clip(t/0.18,0,1))*sm(np.clip((1-t)/0.18,0,1))
+    wc=sm(np.clip((HALF-lat)/(HALF*0.5),0,1))
+    w=(wl*wc)[inb]
+    # 2) ratakan kerusakan: Laplacian terbatas pada pita (bobot w)
+    idx={int(v):i for i,v in enumerate(inb)}
+    nb=[[u.index for e in bm.verts[v].link_edges for u in [e.other_vert(bm.verts[v])]] for v in inb]
+    Q=co.copy()
+    for _ in range(8):
+        N=Q.copy()
+        for i,v in enumerate(inb): N[v]=Q[v]*(1-w[i])+Q[nb[i]].mean(0)*w[i]
+        Q=N
+    # 3) alur: Gaussian ke arah dalam (melawan normal), penuh di lintasan
+    prof=DEPTH*np.exp(-(lat[inb]/SIGMA)**2)*wl[inb]
+    new=Q[inb]-nrm[inb]*prof[:,None]
+    for i,v in enumerate(inb): bm.verts[v].co=mathutils.Vector(new[i])
+    # 4) garis jahitan: face di dasar alur diberi material benang (seperti di bagian jahitan yang utuh)
+    sidx=next((i for i,m in enumerate(me.materials) if m and m.name=='defaultplastic.001'),None)
+    if sidx is not None:
+        near=np.zeros(len(bm.verts),bool); near[inb[(lat[inb]<0.0022)&(wl[inb]>0.5)]]=True
+        for f in bm.faces:
+            if all(near[v.index] for v in f.verts): f.material_index=sidx
+    print('seamfix: pita',len(inb),'vertex; total vertex',len(bm.verts))
+    bm.to_mesh(me); bm.free(); me.update()
