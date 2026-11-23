@@ -18,33 +18,42 @@ def _inside(poly,pts):
         c=((z1>z)!=(z2>z))&(x<(x2-x1)*(z-z1)/(z2-z1+1e-30)+x1); ins^=c
     return ins
 
+def _dil(m):
+    g=m.copy(); g[1:]|=m[:-1]; g[:-1]|=m[1:]; g[:,1:]|=m[:,:-1]; g[:,:-1]|=m[:,1:]; return g
+
+LF=5      # selaput bebas sampai LF sel di luar kontur; sesudahnya menempel pada permukaan asli (3 sel)
+LP=9      # tambalan menutup sampai LP sel di luar kontur (1 sel = 0.5 mm)
 def _cap_end(bm,bvh,side):
     poly=_POLY.copy()
     if side>0: poly[:,0]*=-1
-    xs=np.arange(poly[:,0].min()-0.004,poly[:,0].max()+0.004,STEP); zs=np.arange(-0.02,0.0201,STEP)
+    xs=np.arange(poly[:,0].min()-0.009,poly[:,0].max()+0.009,STEP); zs=np.arange(-0.02,0.0201,STEP)
     XX,ZZ=np.meshgrid(xs,zs); G=np.stack([XX.ravel(),ZZ.ravel()],1)
     inside=_inside(poly,G).reshape(XX.shape)
-    # peta tinggi permukaan luar (sinar dari +y ke -y)
     Hh=np.full(XX.shape,np.nan)
     for i in range(len(zs)):
         for j in range(len(xs)):
             r=bvh.ray_cast(Vector((xs[j],0.06,zs[i])),Vector((0,-1,0)))
             if r[0] is not None: Hh[i,j]=r[0].y
-    # cincin di luar kontur (3 sel) = batas Dirichlet; selaput Laplace di dalam
-    grow=inside.copy()
-    for _ in range(3):
-        g=grow.copy(); g[1:]|=grow[:-1]; g[:-1]|=grow[1:]; g[:,1:]|=grow[:,:-1]; g[:,:-1]|=grow[:,1:]; grow=g
-    ring=grow&~inside&~np.isnan(Hh)
-    if ring.sum()<20: print('handlecap: cincin tidak ditemukan, lewati'); return 0
+    lev=np.full(XX.shape,99); lev[inside]=0; cur=inside.copy()
+    for k in range(1,LP+1):
+        nx=_dil(cur); lev[nx&~cur]=k; cur=nx
+    Hb=Hh.copy(); P=np.pad(Hh,1,constant_values=np.nan); acc=np.zeros_like(Hh); cnt=np.zeros_like(Hh)
+    for di in (0,1,2):
+        for dj in (0,1,2):
+            q=P[di:di+Hh.shape[0],dj:dj+Hh.shape[1]]; ok=~np.isnan(q); acc[ok]+=q[ok]; cnt[ok]+=1
+    Hb=np.where(cnt>0,acc/np.maximum(cnt,1),np.nan); Hb[np.isnan(Hh)]=np.nan; Hh=Hb   # sedikit diperhalus (buang bintil)
+    ring=(lev>LF)&(lev<=LP)&~np.isnan(Hh)
+    if ring.sum()<50: print('handlecap: cincin tidak ditemukan, lewati'); return 0
+    free=lev<=LF
     M=np.where(ring,Hh,np.nanmean(Hh[ring]))
-    for _ in range(3000):
+    for _ in range(8000):
         N=M.copy(); N[1:-1,1:-1]=(M[:-2,1:-1]+M[2:,1:-1]+M[1:-1,:-2]+M[1:-1,2:])/4
-        M=np.where(inside,N,np.where(ring,Hh,M))
+        M=np.where(free,N,np.where(ring,Hh,M))
     def samp(x,z):
         fx=(x-xs[0])/STEP; fz=(z-zs[0])/STEP; i=int(np.clip(np.floor(fz),0,len(zs)-2)); j=int(np.clip(np.floor(fx),0,len(xs)-2)); a=fx-j; b=fz-i
         return (M[i,j]*(1-a)*(1-b)+M[i,j+1]*a*(1-b)+M[i+1,j]*(1-a)*b+M[i+1,j+1]*a*b)
-    # tambalan: jaring segitiga rata (mengikuti selaput) menutup seluruh kontur; cekungan lama tertutup di bawahnya
-    reg=inside.copy(); g=reg.copy(); g[1:]|=reg[:-1]; g[:-1]|=reg[1:]; g[:,1:]|=reg[:,:-1]; g[:,:-1]|=reg[:,1:]; reg=g&(inside|ring)
+    # 2) tambalan segitiga rata menutup kontur (+LP sel)
+    reg=(lev<=LP)&(free|ring)
     vm={}
     def V(i,j):
         if (i,j) not in vm: vm[(i,j)]=bm.verts.new((float(xs[j]),float(M[i,j]),float(zs[i])))
