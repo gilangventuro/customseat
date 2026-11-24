@@ -54,6 +54,7 @@ def mk(name,col,met,rough):
 LEATHER={'Body Utama':'leather_main','Boddy Dalam':'leather_pattern','List Aksen':'leather_accent','defaultplastic.001':'leather_stitch','Jahitan':'leather_stitch',
          'Kulit Utama':'leather_main','Kulit Utama.001':'leather_main','kulit dalam':'leather_pattern','kulit dalam.001':'leather_pattern','kulit dalam.002':'leather_pattern',
          'Kulit Luar':'leather_main','Kulit Luar.001':'leather_main','list':'leather_accent','list.001':'leather_accent'}   # badan + bantalan footrest
+LEATHER={k:('leather_main' if v=='leather_stitch' else v) for k,v in LEATHER.items()}   # material benang (leather_stitch) dihapus: face benang ikut kulit utama
 MATDEF={'leather_main':((0.045,0.046,0.05),0.0,0.55),'leather_pattern':((0.045,0.046,0.05),0.0,0.55),'leather_accent':((0.02,0.40,0.075),0.0,0.5),'leather_stitch':((0.03,0.032,0.036),0.0,0.55),
         'plastik_hitam':((0.025,0.025,0.028),0.0,0.5),'plastik_abu':((0.2,0.2,0.2),0.0,0.5),'pad_hitam':((0.045,0.045,0.047),0.0,0.6),
         'part_handle':((0.025,0.025,0.028),0.0,0.45),'part_cupholder':((0.025,0.025,0.028),0.0,0.5),
@@ -91,7 +92,8 @@ def remap_mats(o,onbody=False,force=None):
     me.polygons.foreach_set('material_index',new[mi]); me.update()
 
 # ---- 3) pecah alas kaki (satu mesh Meshy: bagian depan = footrest, sisanya rangka dasar) ----
-ped=next(o for o in objs if o.name.startswith('Meshy_AI_Dual_Foot_Pedal'))
+ped=next((o for o in objs if o.name.startswith('Meshy_AI_Dual_Foot_Pedal')),None)   # master terbaru: pedal Meshy lama sudah dihapus
+if ped is None: ped=bpy.data.objects.new('_kosong',bpy.data.meshes.new('_kosong')); bpy.context.scene.collection.objects.link(ped); objs.append(ped)
 me=ped.data; nf=len(me.polygons); C=np.empty(nf*3); me.polygons.foreach_get('center',C); C=C.reshape(-1,3)
 masks={'Footrest_Kiri':(C[:,1]<YCUT)&(C[:,0]<XC),'Footrest_Kanan':(C[:,1]<YCUT)&(C[:,0]>=XC)}
 masks['Rangka_Dasar']=~(masks['Footrest_Kiri']|masks['Footrest_Kanan'])
