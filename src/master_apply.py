@@ -67,7 +67,7 @@ def cat(m,onbody):
         if _b in LEATHER: return LEATHER[_b]
     if n in ('Bahan.001','tuas','defaultplastic.064','defaultplastic.065'): return 'tuas_merah'   # .064/.065 = pegangan merah di bracket footrest (legrest)
     if n.startswith('polished') or n in ('Material_5','Material_6'): return 'baja'
-    if n.startswith('satinfinishalu'): return 'aluminium'
+    if n.startswith('satinfinishalu') or n=='defaultplastic.014': return 'aluminium'   # .014 = batang piston (gas spring) legrest -> silver
     if n.startswith('satinfinishwalnut'): return 'kayu_samping' if n.rsplit('.',1)[-1] in ('001','002','005') else 'kayu_atas'   # kayu bertekstur di armrest: dipertahankan
     bc=(0,0,0)
     if m and m.use_nodes:
