@@ -10,7 +10,7 @@ SRC, OUT = sys.argv[-2], sys.argv[-1]
 # (nama cangkang, nama sisi, pusat x, pusat z) -- pusat = tengah keempat baut; jarak baut 0.70 x 0.27 m
 SEATS = [('Sandaran_Belakang_Kanan_02', 'Kanan', 0.516, 1.157),
          ('Sandaran_Belakang_Kiri_02',  'Kiri', -0.854, 1.188)]
-BW, BH = 0.70, 0.27          # jarak baut (lebar x tinggi)
+BW, BH = 0.84, 0.34          # jarak baut (lebar x tinggi)
 PAD = 0.11                   # bantalan persegi di tiap sudut (menutup bundaran baut di cangkang)
 BAND = 0.03                  # lebar pita bingkai
 STRIP_TOP, STRIP_T = 0.016, 0.006   # tinggi permukaan atas strip dari cangkang, tebal strip
@@ -70,7 +70,7 @@ for shell_name, side, cx, cz in SEATS:
     Wo, Ho = BW + 0.05, BH + 0.05           # ukuran luar bingkai
     Wi, Hi = Wo - 2*BAND, Ho - 2*BAND       # ukuran dalam (jendela jaring)
     # ---- jaring ----
-    nu, nv = 70, 30; Wn, Hn = BW + 0.012, BH + 0.03
+    nu, nv = 84, 38; Wn, Hn = BW + 0.012, BH + 0.03
     bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); grid = []
     for j in range(nv + 1):
         row = []
@@ -89,7 +89,7 @@ for shell_name, side, cx, cz in SEATS:
     orient_up(bm, S)
     built.append(new_obj('Jaring_%s_Net' % side, bm, M_NET))
     # ---- karet kain di tepi atas dan bawah jaring (lipatan kain seperti foto referensi) ----
-    SW = 0.05; bm = bmesh.new(); BHH = 0.022; nx, nz = 60, 6
+    SW = 0.05; bm = bmesh.new(); BHH = 0.022; nx, nz = 72, 6
     for sgn in (-1, 1):
         zc = cz + sgn*(BH/2 + 0.015 - BHH/2); gr = []
         for j in range(nz + 1):
