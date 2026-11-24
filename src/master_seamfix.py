@@ -206,19 +206,21 @@ def clean_teeth(body,maxf=6,iters=2):
     """Gigi gergaji di batas warna (segitiga/kelompok kecil <=maxf face bermaterial lain menusuk ke bidang tetangga):
     komponen material berukuran kecil dilebur ke material tetangga yang paling banyak. Garis jahitan utuh (panjang) tidak tersentuh."""
     me=body.data; bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    th={i for i,m in enumerate(me.materials) if m and m.name in ('defaultplastic.001','Jahitan')}
     tot=0
     for it in range(iters):
         seen=[False]*len(bm.faces); ch=0
         for f in bm.faces:
             if seen[f.index]: continue
             l=f.material_index; comp=[f]; seen[f.index]=True; k=0; big=False
+            lim=6 if l in th else maxf   # benang: serpihan kecil saja; kulit utama/panel/aksen: sampai maxf
             while k<len(comp) and not big:
                 for e in comp[k].edges:
                     for g in e.link_faces:
                         if not seen[g.index] and g.material_index==l:
                             seen[g.index]=True; comp.append(g)
                 k+=1
-                if len(comp)>maxf: big=True
+                if len(comp)>lim: big=True
             if big:   # tandai sisa komponen besar agar tidak dihitung ulang
                 while k<len(comp):
                     for e in comp[k].edges:
