@@ -200,3 +200,42 @@ def clean_thread(body,minf=30):
     print('clean_thread: face benang di tepi panel motif dipindah ke panel',moved)
     print('clean_thread: komponen',comps,'face benang kecil dikembalikan ke kulit',fixed)
     bm.to_mesh(me); bm.free(); me.update()
+
+
+def smooth_labels(body,iters=20,thr=0.5):
+    """Tepi batas warna kulit utama/panel motif bergerigi (tangga segitiga + serpihan). Filter mayoritas atas face tetangga
+    (berbagi titik): face pindah ke material lawan bila >thr tetangga bermaterial lawan. Benang & aksen tidak disentuh/dihitung."""
+    me=body.data; bm=bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    names=[m.name if m else '' for m in me.materials]
+    try: A=names.index('Body Utama'); B=names.index('Boddy Dalam')
+    except ValueError: print('smooth_labels: material tidak ditemukan, lewati'); bm.free(); return
+    lab=[f.material_index for f in bm.faces]
+    nb=[]
+    for f in bm.faces:
+        s=set()
+        for v in f.verts:
+            for g in v.link_faces:
+                if g is not f: s.add(g.index)
+        nb.append(list(s))
+    nb2=[]   # cincin ke-2: tetangga dari tetangga -> filter menghaluskan gerigi selebar beberapa face
+    for i in range(len(nb)):
+        s=set(nb[i])
+        for j in nb[i]: s.update(nb[j])
+        s.discard(i); nb2.append(list(s))
+    nb=nb2
+    total=0
+    for it in range(iters):
+        new=lab[:]; ch=0
+        for i,l in enumerate(lab):
+            if l!=A and l!=B: continue
+            own=opp=0
+            for j in nb[i]:
+                m=lab[j]
+                if m==l: own+=1
+                elif m==A or m==B: opp+=1
+            if opp>0 and opp>thr*(own+opp): new[i]=B if l==A else A; ch+=1
+        lab=new; total+=ch
+        if ch==0: break
+    for f,l in zip(bm.faces,lab): f.material_index=l
+    print('smooth_labels: face dipindah',total)
+    bm.to_mesh(me); bm.free(); me.update()

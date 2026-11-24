@@ -40,7 +40,7 @@ bm_=bmesh.new(); bm_.from_mesh(body.data)   # buang sisa geometri liar di dekat 
 st_=[v for v in bm_.verts if v.co.z<0.5]
 if st_: print('buang geometri liar',len(st_)); bmesh.ops.delete(bm_,geom=st_,context='VERTS'); bm_.to_mesh(body.data); body.data.update()
 bm_.free()
-sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); import master_seamfix; master_seamfix.despike(body); master_seamfix.clean_thread(body); master_seamfix.repair(body)   # alur jahitan yang putus di blok kulit kanan-depan dibangun ulang
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); import master_seamfix; master_seamfix.despike(body); master_seamfix.clean_thread(body); master_seamfix.smooth_labels(body); master_seamfix.repair(body)   # alur jahitan yang putus di blok kulit kanan-depan dibangun ulang
 b0,b1=bbox(body); XC=float((b0[0]+b1[0])/2); print('badan x',b0[0],b1[0],'XC',XC)
 
 # ---- 2) material ----
