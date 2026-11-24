@@ -89,19 +89,19 @@ for shell_name, side, cx, cz in SEATS:
     orient_up(bm, S)
     built.append(new_obj('Jaring_%s_Net' % side, bm, M_NET))
     # ---- karet kain di tepi atas dan bawah jaring (lipatan kain seperti foto referensi) ----
-    bm = bmesh.new(); BHH = 0.042; nx, nz = 60, 8
+    SW = 0.05; bm = bmesh.new(); BHH = 0.022; nx, nz = 60, 6
     for sgn in (-1, 1):
-        zc = cz + sgn*(BH/2 + 0.015); gr = []
+        zc = cz + sgn*(BH/2 + 0.015 - BHH/2); gr = []
         for j in range(nz + 1):
             t = j/nz; row = []
             for i in range(nx + 1):
-                x = cx - BW/2 + i/nx*BW; z = zc - BHH/2 + t*BHH
-                p, n = S(x, z); row.append(bm.verts.new(p + n*(NET_D0 + 0.004 + 0.011*math.sin(math.pi*t)**0.7)))
+                x = cx - (BW - SW)/2 + i/nx*(BW - SW); z = zc - BHH/2 + t*BHH
+                p, n = S(x, z); row.append(bm.verts.new(p + n*(NET_D0 + 0.002 + 0.004*math.sin(math.pi*t)**0.7)))
             gr.append(row)
         for j in range(nz):
             for i in range(nx): bm.faces.new((gr[j][i], gr[j][i+1], gr[j+1][i+1], gr[j+1][i]))
     orient_up(bm, S)
-    bmesh.ops.solidify(bm, geom=list(bm.faces), thickness=0.004)
+    bmesh.ops.solidify(bm, geom=list(bm.faces), thickness=0.003)
     bm.normal_update()
     built.append(new_obj('Jaring_%s_Karet' % side, bm, M_BAND))
     # ---- dua strip vertikal di kiri-kanan (seperti foto referensi) + sekrup ----
