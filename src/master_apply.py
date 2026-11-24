@@ -103,9 +103,11 @@ def subset(src,mask,name):
     for m in src.data.materials: nm.materials.append(m)
     o=bpy.data.objects.new(name,nm); bpy.context.scene.collection.objects.link(o); return o
 pieces=[]
-for nm_,mk_ in masks.items():
-    o=subset(ped,mk_,nm_); print('alas kaki',nm_,len(o.data.polygons)); pieces.append(o)
-bpy.data.objects.remove(ped); objs.remove(ped)
+_HAS_LEG=any(x.name=='legrest' for x in objs)
+if not _HAS_LEG:
+    for nm_,mk_ in masks.items():
+        o=subset(ped,mk_,nm_); print('alas kaki',nm_,len(o.data.polygons)); pieces.append(o)
+bpy.data.objects.remove(ped); objs.remove(ped)   # master baru: rangka lama dibuang, diganti rangka dari 'legrest'
 
 # ---- 4) beri nama & tentukan jatah face ----
 plan=[]   # (obj,nama,target_face atau rasio,delimit,onbody)
@@ -115,7 +117,10 @@ _leg=next((x for x in objs if x.name=='legrest'),None)   # master baru: bantalan
 _cush=[x for x in objs if x.name.startswith('Meshy_AI_Stitched')]
 if _leg is not None:
     _m=_leg.data; _n=len(_m.polygons); _C=np.empty(_n*3); _m.polygons.foreach_get('center',_C); _C=_C.reshape(-1,3)
-    for _nm,_mk in (('Bantalan_Kiri',_C[:,0]<XC),('Bantalan_Kanan',_C[:,0]>=XC)):
+    _mi=np.empty(_n,np.int32); _m.polygons.foreach_get('material_index',_mi)
+    _lea=np.array([bool(mm) and cat(mm,True).startswith('leather') for mm in _m.materials])[np.clip(_mi,0,len(_m.materials)-1)]
+    _fr=subset(_leg,~_lea,'Rangka_Dasar'); print('rangka baru (legrest)',len(_fr.data.polygons)); pieces.append(_fr)
+    for _nm,_mk in (('Bantalan_Kiri',_lea&(_C[:,0]<XC)),('Bantalan_Kanan',_lea&(_C[:,0]>=XC))):
         _o=subset(_leg,_mk,_nm); print('legrest',_nm,len(_o.data.polygons)); _cush.append(_o)
     bpy.data.objects.remove(_leg); objs.remove(_leg)
 for o in _cush:   # bantalan footrest (kulit) -> ikut lepas/pasang bersama footrest
