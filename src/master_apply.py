@@ -62,6 +62,9 @@ WOOD={'kayu_atas':'satinfinishwalnut','kayu_samping':'satinfinishwalnut.001'}   
 def cat(m,onbody):
     n=m.name if m else ''
     if onbody and n in LEATHER: return LEATHER[n]
+    if onbody:
+        _b=n.rsplit('.',1)[0] if n.rsplit('.',1)[-1].isdigit() else n
+        if _b in LEATHER: return LEATHER[_b]
     if n in ('Bahan.001','tuas'): return 'tuas_merah'
     if n.startswith('polished') or n in ('Material_5','Material_6'): return 'baja'
     if n.startswith('satinfinishalu'): return 'aluminium'
@@ -108,9 +111,16 @@ bpy.data.objects.remove(ped); objs.remove(ped)
 plan=[]   # (obj,nama,target_face atau rasio,delimit,onbody)
 plan.append((body,'Kursi',BODY_T,{'MATERIAL'},True))
 CUSH_T=int(env('CUSHION_TARGET','180000'))
-for o in [x for x in objs if x.name.startswith('Meshy_AI_Stitched')]:   # bantalan footrest (kulit) -> ikut lepas/pasang bersama footrest
+_leg=next((x for x in objs if x.name=='legrest'),None)   # master baru: bantalan footrest kiri+kanan satu objek 'legrest' -> pecah di tengah badan
+_cush=[x for x in objs if x.name.startswith('Meshy_AI_Stitched')]
+if _leg is not None:
+    _m=_leg.data; _n=len(_m.polygons); _C=np.empty(_n*3); _m.polygons.foreach_get('center',_C); _C=_C.reshape(-1,3)
+    for _nm,_mk in (('Bantalan_Kiri',_C[:,0]<XC),('Bantalan_Kanan',_C[:,0]>=XC)):
+        _o=subset(_leg,_mk,_nm); print('legrest',_nm,len(_o.data.polygons)); _cush.append(_o)
+    bpy.data.objects.remove(_leg); objs.remove(_leg)
+for o in _cush:   # bantalan footrest (kulit) -> ikut lepas/pasang bersama footrest
     b_=bbox(o); side='Kiri' if (b_[0][0]+b_[1][0])/2<XC else 'Kanan'
-    plan.append((o,'Footrest_%s_Bantalan'%side,CUSH_T,{'MATERIAL'},True)); objs.remove(o)
+    plan.append((o,'Footrest_%s_Bantalan'%side,CUSH_T,{'MATERIAL'},True)); (objs.remove(o) if o in objs else None)
 for o in pieces: plan.append((o,o.name,FOOT_T if o.name.startswith('Footrest') else PEDAL_BASE_T,{'NORMAL','MATERIAL'},False))
 cnt={}; FORCE={}; FORCE_OBJ={}
 def nxt(k): cnt[k]=cnt.get(k,-1)+1; return '%s_%02d'%(k,cnt[k])
