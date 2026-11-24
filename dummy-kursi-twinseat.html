@@ -368,7 +368,7 @@ const LEATHER = [['Onyx Black','#1b1c1f'],['Graphite','#2c3036'],['Charcoal','#3
 const PARTS3D = [
   {key:'main',    label:'Kulit Utama', desc:'Bolster & tepi dudukan/sandaran kiri-kanan (warna = tint di atas tekstur asli)',
     mat:['leather_main'], pal:LEATHER},
-  {key:'pattern', label:'Motif Berlian', desc:'Panel quilted/berlian di tengah sandaran, dudukan & footrest kiri-kanan (warna = tint di atas tekstur asli)',
+  {key:'pattern', label:'Motif Berlian', desc:'Panel quilted/berlian di tengah sandaran, dudukan & legrest kiri-kanan (warna = tint di atas tekstur asli)',
     mat:['leather_pattern'], pal:LEATHER},
   {key:'accent',  label:'List Aksen', desc:'Garis list di tepi kiri-kanan (warna = tint di atas tekstur asli)',
     mat:['leather_accent'], pal:LEATHER},
@@ -577,8 +577,8 @@ function renderLogo(){
 const ACC = [
   {key:'handrest_kiri',  label:'Handrest Kiri',  match:'Handrest_Kiri',  kind:'hand'},
   {key:'handrest_kanan', label:'Handrest Kanan', match:'Handrest_Kanan', kind:'hand'},
-  {key:'footrest_kiri',  label:'Footrest Kiri',  match:'Footrest_Kiri',  kind:'foot'},
-  {key:'footrest_kanan', label:'Footrest Kanan', match:'Footrest_Kanan', kind:'foot'},
+  {key:'footrest_kiri',  label:'Legrest Kiri',  match:'Footrest_Kiri',  kind:'foot'},
+  {key:'footrest_kanan', label:'Legrest Kanan', match:'Footrest_Kanan', kind:'foot'},
   {key:'handrest_tengah', label:'Handrest Tengah', match:'Handrest_Tengah', kind:'mid'},
   {key:'net_kiri',  label:'Kantung Jaring Kiri',  match:'Jaring_Kiri',  kind:'net'},
   {key:'net_kanan', label:'Kantung Jaring Kanan', match:'Jaring_Kanan', kind:'net'},
@@ -747,7 +747,7 @@ function makeNetTexture(){
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
 const netPromise = loader.loadAsync('assets/net-pocket.glb?v=20261124c').catch(() => null);
-loader.load('assets/twin-seat-meshy.glb?v=20261125d',
+loader.load('assets/twin-seat-meshy.glb?v=20261125e',
   async gltf => {
     model = gltf.scene;
 
