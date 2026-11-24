@@ -19,7 +19,7 @@ YCUT=float(env('FOOT_YCUT','-1.75'))      # bagian alas kaki: titik di depan gar
 # ---- 1) kumpulkan, catat induk, bake transformasi dunia ke mesh ----
 objs=[o for o in bpy.data.objects if o.type=='MESH']
 _b0=next(o for o in objs if o.name.startswith('Meshy_AI_Twin_Luxe_Seats'))   # satu badan saja; salinan kerja (.001/.002) & bola uji jahitan di file master tidak ikut diekspor
-_keep=[o for o in objs if o is _b0 or not (o.name.startswith('Meshy_AI_Twin_Luxe_Seats') or o.name.startswith('Icosphere'))]
+_keep=[o for o in objs if o is _b0 or not (o.name.startswith('Meshy_AI_Twin_Luxe_Seats') or o.name.startswith('Icosphere') or o.name.startswith('Jaring_'))]   # jaring kantung dimuat dari assets/net-pocket.glb; salinan di master tidak ikut (menumpuk)
 for _o in [o for o in objs if o not in _keep]: bpy.data.objects.remove(_o)
 objs=_keep
 par={o.name:(o.parent.name if o.parent else None) for o in objs}
