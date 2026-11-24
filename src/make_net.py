@@ -25,6 +25,7 @@ def mat(name, col, rough):
     b = m.node_tree.nodes['Principled BSDF']; b.inputs['Base Color'].default_value = col; b.inputs['Roughness'].default_value = rough
     return m
 M_NET = mat('net_mesh', (0.04, 0.045, 0.05, 1), 0.9)
+M_BAND = mat('net_band', (0.03, 0.032, 0.036, 1), 0.95)
 M_FRAME = mat('net_frame', (0.012, 0.013, 0.015, 1), 0.7)
 
 def make_surface(shell, cx, cz):
@@ -87,6 +88,22 @@ for shell_name, side, cx, cz in SEATS:
                 l[uvl].uv = (a/nu*Wn, b/nv*Hn)      # UV dalam meter (tekstur jaring diulang di situs)
     orient_up(bm, S)
     built.append(new_obj('Jaring_%s_Net' % side, bm, M_NET))
+    # ---- karet kain di tepi atas dan bawah jaring (lipatan kain seperti foto referensi) ----
+    bm = bmesh.new(); BHH = 0.042; nx, nz = 60, 8
+    for sgn in (-1, 1):
+        zc = cz + sgn*(BH/2 + 0.015); gr = []
+        for j in range(nz + 1):
+            t = j/nz; row = []
+            for i in range(nx + 1):
+                x = cx - BW/2 + i/nx*BW; z = zc - BHH/2 + t*BHH
+                p, n = S(x, z); row.append(bm.verts.new(p + n*(NET_D0 + 0.004 + 0.011*math.sin(math.pi*t)**0.7)))
+            gr.append(row)
+        for j in range(nz):
+            for i in range(nx): bm.faces.new((gr[j][i], gr[j][i+1], gr[j+1][i+1], gr[j+1][i]))
+    orient_up(bm, S)
+    bmesh.ops.solidify(bm, geom=list(bm.faces), thickness=0.004)
+    bm.normal_update()
+    built.append(new_obj('Jaring_%s_Karet' % side, bm, M_BAND))
     # ---- dua strip vertikal di kiri-kanan (seperti foto referensi) + sekrup ----
     bm = bmesh.new(); SW, SH = 0.05, BH + 0.03; nx, nz = 6, 40
     for sx in (-1, 1):
