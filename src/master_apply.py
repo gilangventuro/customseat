@@ -119,7 +119,8 @@ if _leg is not None:
     _m=_leg.data; _n=len(_m.polygons); _C=np.empty(_n*3); _m.polygons.foreach_get('center',_C); _C=_C.reshape(-1,3)
     _mi=np.empty(_n,np.int32); _m.polygons.foreach_get('material_index',_mi)
     _lea=np.array([bool(mm) and cat(mm,True).startswith('leather') for mm in _m.materials])[np.clip(_mi,0,len(_m.materials)-1)]
-    _fr=subset(_leg,~_lea,'Rangka_Dasar'); print('rangka baru (legrest)',len(_fr.data.polygons)); pieces.append(_fr)
+    for _nm,_mk in (('Footrest_Kiri_Rangka',(~_lea)&(_C[:,0]<XC)),('Footrest_Kanan_Rangka',(~_lea)&(_C[:,0]>=XC))):   # pelat, pegas gas, bracket: satu unit dengan bantalan, ikut lepas
+        _fr=subset(_leg,_mk,_nm); print('rangka footrest (legrest)',_nm,len(_fr.data.polygons)); pieces.append(_fr)
     for _nm,_mk in (('Bantalan_Kiri',_lea&(_C[:,0]<XC)),('Bantalan_Kanan',_lea&(_C[:,0]>=XC))):
         _o=subset(_leg,_mk,_nm); print('legrest',_nm,len(_o.data.polygons)); _cush.append(_o)
     bpy.data.objects.remove(_leg); objs.remove(_leg)
