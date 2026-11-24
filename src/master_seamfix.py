@@ -35,7 +35,16 @@ def _band(P,path,extra=0.0):
         d=np.linalg.norm(P-q,axis=1); m=d<best; best[m]=d[m]; bt[m]=(i+w[m])/len(seg); bi[m]=i
     return best,bt,bi
 
-def repair(body):
+def repair(body,mirror=False):
+    """mirror=True: alur yang sama untuk blok kiri-depan (cermin terhadap tengah badan twin seat)."""
+    global PTS,TS
+    if mirror:
+        _P,_T=PTS,TS
+        co_=np.array([v.co[:] for v in body.data.vertices]); xc=float((co_[:,0].min()+co_[:,0].max())/2)
+        PTS=_P.copy(); PTS[:,0]=2*xc-PTS[:,0]; TS=_T.copy(); TS[:,0]=-TS[:,0]
+        print('seamfix: cermin terhadap x =',round(xc,4))
+        try: return repair(body)
+        finally: PTS,TS=_P,_T
     me=body.data; bm=bmesh.new(); bm.from_mesh(me)
     path=_path()
     co=np.array([v.co[:] for v in bm.verts]); d,t,_=_band(co,path)
