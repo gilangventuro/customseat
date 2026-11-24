@@ -747,7 +747,7 @@ function makeNetTexture(){
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
 const netPromise = loader.loadAsync('assets/net-pocket.glb?v=20261124c').catch(() => null);
-loader.load('assets/twin-seat-meshy.glb?v=20261125b',
+loader.load('assets/twin-seat-meshy.glb?v=20261125c',
   async gltf => {
     model = gltf.scene;
 
@@ -759,7 +759,6 @@ loader.load('assets/twin-seat-meshy.glb?v=20261125b',
       const mats = Array.isArray(n.material) ? n.material : [n.material];
       mats.forEach(m => { m.side = THREE.DoubleSide; });
       if (mats.some(m => STRIP_MATERIALS.includes(m.name))) toStrip.push(n);
-      if (/^Rangka_Lain_(0[1-9]|1[01])$/.test(n.name)) toStrip.push(n);   /* rangka kantung lama di sandaran kiri: dibuang, diganti jaring baru */
     });
     toStrip.forEach(n => n.parent && n.parent.remove(n));
 
