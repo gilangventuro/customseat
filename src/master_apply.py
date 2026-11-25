@@ -149,6 +149,7 @@ for o in objs:
     ctr=bbox(o); cx=float((ctr[0][0]+ctr[1][0])/2)
     if nm.startswith(('Sandaran_Belakang','Handle','Cupholder')): nm+= '_Kiri' if cx<XC else '_Kanan'
     FORCE_OBJ[o.name]=FORCE.get(nm.rsplit('_',1)[0] if nm.endswith(('_Kiri','_Kanan')) else nm)
+    if n.startswith('PART -PU AR'): FORCE_OBJ[o.name]='aluminium'   # pad di bawah kayu armrest (kiri/tengah/kanan): silver
     if n.startswith('PUSH BOTTOM'): FORCE_OBJ[o.name]='tuas_merah'   # tombol dorong armrest: seluruhnya merah (bagian hijau penanda ikut merah)
     plan.append((o,nxt(nm) if nm not in ('Handrest_Kanan_Tuas',) else nm,r,{'NORMAL','MATERIAL'},False))
 
