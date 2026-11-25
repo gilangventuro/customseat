@@ -130,6 +130,16 @@ for o in _cush:   # bantalan footrest (kulit) -> ikut lepas/pasang bersama footr
     b_=bbox(o); side='Kiri' if (b_[0][0]+b_[1][0])/2<XC else 'Kanan'
     plan.append((o,'Footrest_%s_Bantalan'%side,CUSH_T,{'MATERIAL'},True)); (objs.remove(o) if o in objs else None)
 for o in pieces: plan.append((o,o.name,FOOT_T if o.name.startswith('Footrest') else PEDAL_BASE_T,{'NORMAL','MATERIAL'},False))
+# pelat dudukan: mengisi celah antara rel rangka dan dasar dudukan agar kursi tidak terlihat mengambang
+def _slab(name,x0,x1,y0,y1,z0,z1,bev=0.014):
+    bm=bmesh.new(); bmesh.ops.create_cube(bm,size=1.0)
+    for v in bm.verts: v.co.x=x0+(v.co.x+0.5)*(x1-x0); v.co.y=y0+(v.co.y+0.5)*(y1-y0); v.co.z=z0+(v.co.z+0.5)*(z1-z0)
+    bmesh.ops.bevel(bm,geom=list(bm.edges),offset=bev,segments=3,affect='EDGES')
+    me_=bpy.data.meshes.new(name); bm.to_mesh(me_); bm.free()
+    o_=bpy.data.objects.new(name,me_); bpy.context.scene.collection.objects.link(o_); return o_
+BASE_Z0,BASE_Z1=float(env('BASE_Z0','0.565')),float(env('BASE_Z1','0.700'))
+for _nm,_x0,_x1 in (('Rangka_Dudukan_Kiri',-1.38,-0.28),('Rangka_Dudukan_Kanan',0.00,1.06)):
+    plan.append((_slab(_nm,_x0,_x1,-1.80,-0.76,BASE_Z0,BASE_Z1),_nm,1.0,{'NORMAL'},False))
 cnt={}; FORCE={}; FORCE_OBJ={}
 def nxt(k): cnt[k]=cnt.get(k,-1)+1; return '%s_%02d'%(k,cnt[k])
 for o in objs:
