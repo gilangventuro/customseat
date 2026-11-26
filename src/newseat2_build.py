@@ -200,7 +200,13 @@ def slab(name,x0,x1,y0,y1,z0,z1):
     keep.append(o)
 slab('Rangka_Dudukan_Kiri',-1.145,-0.045,-1.80,-0.76,0.571,0.60)
 slab('Rangka_Dudukan_Kanan',0.215,1.235,-1.80,-0.76,0.571,0.60)
-# (penyesuaian cangkang/alas jaring dibatalkan atas permintaan user: cangkang, cupholder & jaring tetap seperti di file Blender)
+# alas hitam tepat di belakang jaring (seukuran jaring): menutupi dudukan bulat di sudut-sudutnya; cangkang tetap seperti file Blender
+for side in ('Kiri','Kanan'):
+    nt=bpy.data.objects['Jaring_%s_Net'%side]
+    d=nt.copy(); d.data=nt.data.copy(); bpy.context.scene.collection.objects.link(d); d.name='Jaring_%s_Alas'%side; d.data.name=d.name
+    d.data.materials.clear(); d.data.materials.append(blk)
+    for u in list(d.data.uv_layers): d.data.uv_layers.remove(u)
+    wd=W(d); wd[:,1]+=0.0; wd[:,1]-=float(os.environ.get('ALAS_DY','0.006')); setW(d,wd); keep.append(d)
 # ---- buang semua yang bukan bagian model baru, lalu ekspor
 final={o.name for o in keep}
 for o in list(bpy.data.objects):
