@@ -28,13 +28,14 @@ beads=beads&(dens<float(os.environ.get('DENS','0.16')))
 NOSTITCH=os.environ.get('STITCH','0')!='1'   # jahitan dimatikan sementara: manik dibuang dari tint-base & albedo (diisi dari kulit sekitar)
 if NOSTITCH:
     from scipy.ndimage import binary_dilation as _bd, distance_transform_edt as _edt
-    raw=(L4-grey_opening(L4,size=(9,9)))>float(os.environ.get('RAWT','12'))
-    msk=_bd(raw,iterations=3)
+    raw=(L4-grey_opening(L4,size=(9,9)))>float(os.environ.get('RAWT','7'))
+    msk=_bd(raw,iterations=4)
     idx=_edt(msk,return_distances=False,return_indices=True)
     B4f=B4[idx[0],idx[1]]
     for c in range(3): B4f[...,c]=np.where(msk,gaussian_filter(B4f[...,c],2),B4[...,c])
     base=Image.fromarray(np.clip(B4f,0,255).astype(np.uint8)).resize((H,H),Image.BOX)
     beads=np.zeros_like(beads)
+    A=np.asarray(base).astype(np.float32); L=0.299*A[...,0]+0.587*A[...,1]+0.114*A[...,2]   # tint-base dihitung dari albedo bersih
 Sf=np.asarray(Image.fromarray((beads*255).astype(np.uint8)).resize((H,H),Image.BOX)).astype(np.float32)/255
 S=Sf>0.3
 LEVEL,THREAD=0.80,0.96
@@ -42,7 +43,9 @@ tint=np.zeros(L.shape,np.float32)
 for c in range(3):
     sel=(C==c)&~S
     m=sel.astype(np.float32); low=gaussian_filter(np.where(sel,L,0),6)/(gaussian_filter(m,6)+1e-6)
-    hp=np.where(sel,L-low,0); sd=hp[sel].std()+1e-6; hp=np.clip(hp/sd,-2.5,2.5)
+    from scipy.ndimage import binary_erosion
+    core=binary_erosion(sel,iterations=6) if NOSTITCH else sel   # tanpa jahitan: serat halus hanya di inti panel, tepi alur rata (tak ada garis sisa)
+    hp=np.where(core,L-low,0); sd=hp[core].std()+1e-6; hp=np.clip(hp/sd,-2.5,2.5)
     tint+=np.where(C==c,LEVEL+0.035*hp,0)
 tint=tint+(1.0-tint)*np.clip(Sf*2.4,0,1)
 tint=np.clip(tint,0.5,1.0)
