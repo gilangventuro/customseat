@@ -643,13 +643,8 @@ function threadify(m){
   m.onBeforeCompile = sh => {
     sh.uniforms.tThreadMask = THREAD.tThreadMask; sh.uniforms.uThread = THREAD.uThread;
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>
-uniform sampler2D tThreadMask;
-uniform vec3 uThread;')
-      .replace('#include <map_fragment>', '#include <map_fragment>
-#ifdef USE_MAP
- diffuseColor.rgb = mix(diffuseColor.rgb, uThread, texture2D(tThreadMask, vMapUv).r);
-#endif');
+      .replace('#include <common>', '#include <common>\nuniform sampler2D tThreadMask;\nuniform vec3 uThread;')
+      .replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\n diffuseColor.rgb = mix(diffuseColor.rgb, uThread, texture2D(tThreadMask, vMapUv).r);\n#endif');
   };
   m.customProgramCacheKey = () => 'thread1';
   m.needsUpdate = true;
@@ -765,7 +760,7 @@ function makeNetTexture(){
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
 /* jaring kini bagian dari model utama (objek Jaring_Kiri_* / Jaring_Kanan_* di twin-seat-meshy.glb), tidak ada file jaring terpisah lagi */
-loader.load('assets/twin-seat-meshy.glb?v=20261126c',
+loader.load('assets/twin-seat-meshy.glb?v=20261126d',
   async gltf => {
     model = gltf.scene;
 
