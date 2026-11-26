@@ -3,29 +3,44 @@
 import bpy,bmesh,numpy as np,json,math,sys,re,os
 P='C:/Users/LENOVO LOQ/Projects/alldila-jok-simulator/'
 OUT=sys.argv[sys.argv.index('--')+1] if '--' in sys.argv else P+'_tmp_new2.glb'
-DX=-3.51; DEC=float(os.environ.get('DEC','0.5'))
+DX=0.0; DEC=float(os.environ.get('DEC','0.5'))
 def log(*a): print(*a,flush=True)
 bpy.ops.wm.open_mainfile(filepath=P+'SEATS ALLDILA UPDATE 2.blend')
+for m in [m for m in bpy.data.materials if m.users==0]: bpy.data.materials.remove(m)
 names={o.name for o in bpy.data.objects if o.type=='MESH'}
 for o in bpy.data.objects:
     if o.type=='MESH':
         bpy.context.view_layer.objects.active=o
         if o.mode!='OBJECT': bpy.ops.object.mode_set(mode='OBJECT')
-# ---- peta nama klaster 2 -> nama kanonik
+def strip(n): return re.sub(r'\.\d{3}$','',n)
 canon={}
 for n in names:
-    if n.endswith('.001') and n[:-4] in names and not n.startswith(('Jaring','Kubus','Mesh_0')): canon[n]=n[:-4]
+    if n.startswith('Kubus') or n=='Handrest_Tengah_05.002' or n.startswith('Jaring'): continue
+    canon[n]=strip(n)
 canon['Sandaran_Belakang_Kiri_02.002']='Sandaran_Belakang_Kanan_02'
 canon['Handle_Kiri_00.002']='Handle_Kanan_00'
 canon['Cupholder_Kiri_00.002']='Cupholder_Kanan_00'
 canon['Mesh_0']='Kursi_Kiri'; canon['Mesh_0.001']='Kursi_Kanan'
-canon={k:v for k,v in canon.items() if k in names}
-log('klaster2',len(canon))
-# bahan kanonik dari klaster 1 (per objek, per slot)
-src_mats={}
-for k,v in canon.items():
-    s=bpy.data.objects.get(v) if v not in ('Kursi_Kiri','Kursi_Kanan') else None
-    if s is not None and s.name not in canon: src_mats[k]=[sl.material for sl in s.material_slots]
+log('objek model',len(canon))
+# bahan bersufiks (.003/.004...) digabung ke satu bahan kanonik; dua kayu berbeda tetap dua
+WOODS={}
+def canon_mat(m):
+    b=strip(m.name)
+    if b=='satinfinishwalnut':
+        WOODS.setdefault(m.name,len(WOODS)); return 'satinfinishwalnut' if WOODS[m.name]==0 else 'satinfinishwalnut.001'
+    return b
+cm={}
+for m in list(bpy.data.materials):
+    cm.setdefault(canon_mat(m),[]).append(m)
+canonmat={}
+for k,vs in cm.items():
+    main=vs[0]
+    for o in vs[1:]: o.user_remap(main)
+    canonmat[k]=main
+for k,main in canonmat.items():
+    for o in list(bpy.data.materials):
+        if o is not main and o.name==k: o.name=k+'_x'
+    main.name=k
 def W(o):
     M=np.array(o.matrix_world); v=np.zeros(len(o.data.vertices)*3); o.data.vertices.foreach_get('co',v); return v.reshape(-1,3)@M[:3,:3].T+M[:3,3]
 def setW(o,w):
@@ -36,7 +51,7 @@ for k,v in canon.items():
     o=bpy.data.objects[k]; w=W(o); w[:,0]+=DX; setW(o,w); keep.append(o)
 _ks={o.name for o in keep}
 for o in list(bpy.data.objects):
-    if o.name not in _ks: bpy.data.objects.remove(o,do_unlink=True)   # buang klaster 1 & sampah dulu supaya nama kanonik tidak bertabrakan
+    if o.name not in _ks: bpy.data.objects.remove(o,do_unlink=True)
 # ---- bahan kulit bertekstur baru
 for nm in ('leather_main','leather_pattern','leather_accent','leather_stitch'):
     if nm in bpy.data.materials: bpy.data.materials[nm].name='old_'+nm
@@ -78,20 +93,39 @@ for k in ('Mesh_0','Mesh_0.001'):
     me.polygons.foreach_set('material_index',fc)
     for p in me.polygons: p.use_smooth=True
     log('seat',nn,n0,'->',len(me.polygons),np.bincount(fc,minlength=3).tolist())
-# ---- bahan objek lain: ikut klaster 1 (kanonik); bantalan legrest -> kulit baru + UV tambalan datar
-def strip(n): return re.sub(r'\.\d{3}$','',n)
+# ---- nama objek kanonik + bahan kulit baru untuk bantalan legrest
 for o in keep:
     if o.name.startswith('Kursi_'): continue
     nn=canon[o.name]
-    old=[sl.material for sl in o.material_slots]; sm=src_mats.get(o.name)
-    newm=[]
-    for i,m in enumerate(old):
-        t=sm[i] if (sm and len(sm)==len(old)) else bpy.data.materials.get(strip(m.name) if m else '', m)
-        if t is not None and t.name.startswith('old_'): t=LM[t.name[4:]]
-        if t is not None and t.name in LM: t=LM[t.name]
-        newm.append(t or m)
-    for i,t in enumerate(newm): o.data.materials[i]=t   # jangan clear(): indeks material face ikut ter-reset
+    for i,sl in enumerate(o.material_slots):
+        t=sl.material
+        if t is not None and t.name in LM: o.data.materials[i]=LM[t.name]
+        elif t is not None and t.name.startswith('old_'): o.data.materials[i]=LM[t.name[4:]]
     o.name=nn; o.data.name=nn
+# ---- jaring yang oleh user sudah digabung ke cangkang -> pisah jadi objek sendiri (Jaring_<sisi>_Bingkai/Karet/Net) supaya tetap bisa dilepas
+NETN={'net_frame':'Bingkai','net_band':'Karet','net_mesh':'Net'}
+for side in ('Kiri','Kanan'):
+    sh=bpy.data.objects['Sandaran_Belakang_%s_02'%side]
+    for idx,sl in enumerate(list(sh.material_slots)):
+        base=sl.material.name if sl.material else ''
+        if base not in NETN: continue
+        d=sh.copy(); d.data=sh.data.copy(); bpy.context.scene.collection.objects.link(d)
+        bm=bmesh.new(); bm.from_mesh(d.data)
+        bmesh.ops.delete(bm,geom=[f for f in bm.faces if f.material_index!=idx],context='FACES')
+        bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
+        bm.to_mesh(d.data); bm.free()
+        d.name='Jaring_%s_%s'%(side,NETN[base]); d.data.name=d.name
+        me=d.data; me.materials.clear(); me.materials.append(sl.material)
+        if NETN[base]=='Net':   # UV planar dalam meter (tekstur jaring di situs berulang tiap 0,028 m)
+            for u in list(me.uv_layers): me.uv_layers.remove(u)
+            uv=me.uv_layers.new(name='UVMap'); li=np.zeros(len(me.loops),dtype=np.int32); me.loops.foreach_get('vertex_index',li)
+            w=W(d)[li]; uv.data.foreach_set('uv',np.stack([w[:,0],w[:,2]],1).ravel())
+        keep.append(d)
+    bm=bmesh.new(); bm.from_mesh(sh.data)
+    bmesh.ops.delete(bm,geom=[f for f in bm.faces if f.material_index!=0],context='FACES')
+    bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS')
+    bm.to_mesh(sh.data); bm.free()
+    sh.data.materials.clear(); sh.data.materials.append(canonmat['plastik_hitam'])
 for nn in ('Footrest_Kiri_Bantalan','Footrest_Kanan_Bantalan'):
     o=bpy.data.objects[nn]; me=o.data
     for u in list(me.uv_layers): me.uv_layers.remove(u)
@@ -101,7 +135,7 @@ for nn in ('Footrest_Kiri_Bantalan','Footrest_Kanan_Bantalan'):
     S=0.010; u=(FL['x']+0.5)/H+q[:,0]*S; v=1-(FL['y']+0.5)/H+q[:,1]*S
     uv.data.foreach_set('uv',np.stack([u,v],1).ravel())
 # ---- perbaikan yang sudah disepakati sebelumnya (diterapkan ulang pada geometri klaster 2)
-blk=bpy.data.materials['plastik_hitam']; alu=bpy.data.materials['aluminium']
+blk=canonmat['plastik_hitam']; alu=canonmat['aluminium']
 for m in bpy.data.materials:
     if m.name.startswith('plastik_hitam') and m.use_nodes:
         b=[n for n in m.node_tree.nodes if n.type=='BSDF_PRINCIPLED'][0]
@@ -145,8 +179,8 @@ def slab(name,x0,x1,y0,y1,z0,z1):
     o=bpy.data.objects.new(name,me); bpy.context.scene.collection.objects.link(o); me.materials.append(blk)
     for p in me.polygons: p.use_smooth=True
     keep.append(o)
-slab('Rangka_Dudukan_Kiri',-1.38,-0.28,-1.80,-0.76,0.571,0.60)
-slab('Rangka_Dudukan_Kanan',-0.02,1.00,-1.80,-0.76,0.571,0.60)
+slab('Rangka_Dudukan_Kiri',-1.145,-0.045,-1.80,-0.76,0.571,0.60)
+slab('Rangka_Dudukan_Kanan',0.215,1.235,-1.80,-0.76,0.571,0.60)
 # ---- buang semua yang bukan bagian model baru, lalu ekspor
 final={o.name for o in keep}
 for o in list(bpy.data.objects):

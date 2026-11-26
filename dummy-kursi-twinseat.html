@@ -764,8 +764,8 @@ function makeNetTexture(){
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
-const netPromise = loader.loadAsync('assets/net-pocket.glb?v=20261126a').catch(() => null);
-loader.load('assets/twin-seat-meshy.glb?v=20261126b',
+/* jaring kini bagian dari model utama (objek Jaring_Kiri_* / Jaring_Kanan_* di twin-seat-meshy.glb), tidak ada file jaring terpisah lagi */
+loader.load('assets/twin-seat-meshy.glb?v=20261126c',
   async gltf => {
     model = gltf.scene;
 
@@ -786,15 +786,8 @@ loader.load('assets/twin-seat-meshy.glb?v=20261126b',
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     model.position.sub(center);
-    const net = await netPromise;
-    if (net) {
-      const netMat = new THREE.MeshStandardMaterial({ map: makeNetTexture(), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.85, metalness: 0 });
-      net.scene.traverse(n => {
-        if (!n.isMesh) return;
-        if (n.name.endsWith('_Net')) n.material = netMat; else n.material.side = THREE.DoubleSide;
-      });
-      model.add(net.scene);
-    }
+    const netMat = new THREE.MeshStandardMaterial({ map: makeNetTexture(), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.85, metalness: 0 });
+    model.traverse(n => { if (n.isMesh && n.name.endsWith('_Net')) n.material = netMat; });
 
     const radius = Math.max(size.x, size.y, size.z) * 0.5 || 100;
     const dist = radius / Math.sin((camera.fov * Math.PI/180) / 2) * 1.36;
