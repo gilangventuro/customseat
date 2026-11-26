@@ -90,14 +90,13 @@ for k in ('Mesh_0','Mesh_0.001'):
     fc=votes.argmax(1).astype(np.int32)
     # haluskan kelas per-face: face yang kelasnya terisolasi (mayoritas tetangga sisi sama berkelas lain) ikut tetangganya -> tepi list rapi
     _bm=bmesh.new(); _bm.from_mesh(me); _bm.faces.ensure_lookup_table()
-    nb=[[f2.index for e in f.edges for f2 in e.link_faces if f2 is not f] for f in _bm.faces]; _bm.free()
-    for _ in range(3):
+    nb=[list({f2.index for v in f.verts for f2 in v.link_faces if f2 is not f}) for f in _bm.faces]; _bm.free()
+    for _ in range(5):   # mayoritas tetangga (berbagi titik) -> tepi list mulus
         nf=fc.copy()
         for i,l in enumerate(nb):
             if len(l)<3: continue
             cc=np.bincount(fc[l],minlength=3); m=cc.argmax()
-            if m!=fc[i] and cc[m]>=len(l)-0 and cc[fc[i]]==0: nf[i]=m
-            elif m!=fc[i] and cc[m]>=len(l)-1 and cc[fc[i]]<=1 and len(l)>=3: nf[i]=m
+            if m!=fc[i] and cc[m]*2>len(l) and cc[m]>cc[fc[i]]: nf[i]=m
         fc=nf
     me.materials.clear()
     for nm in ('leather_main','leather_pattern','leather_accent'): me.materials.append(LM[nm])

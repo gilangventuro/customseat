@@ -25,6 +25,13 @@ for _ in range(2):
         if sm.any():
             keepm=~sm; idx=distance_transform_edt(~keepm,return_distances=False,return_indices=True)
             cls=cls[idx[0],idx[1]]
+# haluskan batas kelas: peta indikator di-blur lalu argmax -> tepi list mulus, tanpa gerigi/bintik
+from scipy.ndimage import gaussian_filter
+pr=np.stack([gaussian_filter((cls==c).astype(np.float32),6) for c in range(3)],0); cls=pr.argmax(0).astype(np.uint8)
+for c in range(3):
+    lab,n=label(cls==c); cnt=np.bincount(lab.ravel()); small=(cnt<MIN); small[0]=False
+    if small[lab].any():
+        idx=distance_transform_edt(small[lab],return_distances=False,return_indices=True); cls=cls[idx[0],idx[1]]
 print('frac',[(cls==c).mean().round(3) for c in range(3)])
 np.save('_tmp_tex/classmap.npy',cls)
 vis=np.zeros(cls.shape+(3,),np.uint8); vis[cls==0]=(20,20,30); vis[cls==1]=(150,90,60); vis[cls==2]=(60,200,190)
