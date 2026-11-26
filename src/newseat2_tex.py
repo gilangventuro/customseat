@@ -13,8 +13,18 @@ C=np.load('_tmp_tex/classmap.npy')
 from scipy.ndimage import grey_opening, label
 B4=np.asarray(Image.open('_tmp_tex/base.png').convert('RGB')).astype(np.float32); L4=0.299*B4[...,0]+0.587*B4[...,1]+0.114*B4[...,2]
 beads=(L4-grey_opening(L4,size=(9,9)))>float(os.environ.get('BEAD_T','28'))
-lab,n=label(beads); cnt=np.bincount(lab.ravel()); keepc=cnt>=6; keepc[0]=False; beads=keepc[lab]
-beads=beads
+lab,n=label(beads); cnt=np.bincount(lab.ravel())
+# buang bercak liar: terlalu kecil/besar, atau memanjang seperti goresan (artefak tepi UV) -> hanya manik bulat kecil yang dipertahankan
+from scipy.ndimage import find_objects
+keepc=(cnt>=6)&(cnt<=140); keepc[0]=False
+for i,sl in enumerate(find_objects(lab),1):
+    if not keepc[i]: continue
+    hh=sl[0].stop-sl[0].start; ww=sl[1].stop-sl[1].start
+    if max(hh,ww)>16 or max(hh,ww)>3.2*max(1,min(hh,ww)): keepc[i]=False
+beads=keepc[lab]
+# area padat (jalur tumpang tindih / persimpangan acak): kepadatan manik terlalu tinggi -> buang
+dens=gaussian_filter(beads.astype(np.float32),10)
+beads=beads&(dens<float(os.environ.get('DENS','0.16')))
 Sf=np.asarray(Image.fromarray((beads*255).astype(np.uint8)).resize((H,H),Image.BOX)).astype(np.float32)/255
 S=Sf>0.3
 LEVEL,THREAD=0.80,0.96
