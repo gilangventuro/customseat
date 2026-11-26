@@ -49,6 +49,9 @@ for c in range(3):
     tint+=np.where(C==c,LEVEL+0.035*hp,0)
 tint=tint+(1.0-tint)*np.clip(Sf*2.4,0,1)
 tint=np.clip(tint,0.5,1.0)
+if NOSTITCH:   # buang bintik/garis terang sisa: median halus + batas atas rendah (tak ada yang lebih terang dari kulit)
+    from scipy.ndimage import median_filter as _mf
+    tint=np.clip(_mf(tint,size=5),0.70,0.84)
 g=(tint*255).astype(np.uint8); rgb=np.stack([g,g,g],-1)
 im=Image.fromarray(rgb); im.save('_tmp_tex/tint2048.jpg',quality=90); im.save('_tmp_tex/tint2048.webp',quality=85)
 nm=Image.open('_tmp_tex/normal.png').convert('RGB').resize((H,H),Image.LANCZOS); nm.save('_tmp_tex/normal2048.jpg',quality=92)
