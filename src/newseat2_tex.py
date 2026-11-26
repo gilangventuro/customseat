@@ -35,3 +35,7 @@ score[:64]=1e9;score[-64:]=1e9;score[:,:64]=1e9;score[:,-64:]=1e9
 y,x=np.unravel_index(score.argmin(),score.shape); print('flat patch',x,y,score.min())
 json.dump({'x':int(x),'y':int(y),'w':w,'H':H},open('_tmp_tex/flatuv.json','w'))
 print('tint mean',tint.mean())
+# peta benang (putih=benang) untuk warna jahitan yang bisa diganti di situs (shader di dummy-kursi-twinseat.html)
+mask=np.clip(gaussian_filter(S.astype(np.float32),0.8)*1.6,0,1)
+Image.fromarray((mask*255).astype(np.uint8)).save('_tmp_tex/thread-mask.webp',quality=90)
+print('thread mask coverage',float((mask>0.5).mean()))
