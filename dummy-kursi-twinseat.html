@@ -372,8 +372,6 @@ const PARTS3D = [
     mat:['leather_pattern'], pal:LEATHER},
   {key:'accent',  label:'List Aksen', desc:'Garis list di tepi kiri-kanan (warna = tint di atas tekstur asli)',
     mat:['leather_accent'], pal:LEATHER},
-  {key:'stitch',  label:'Warna Jahitan', desc:'Benang jahitan di alur panel & tepi kiri-kanan (warna benang, kulit tidak berubah)',
-    mat:[], thread:true, pal:LEATHER},
   {key:'handle',  label:'Handle Sandaran', desc:'Pegangan di bagian atas cangkang belakang kiri-kanan',
     mat:['part_handle'], pal:LEATHER},
   {key:'cupholder', label:'Cup Holder', desc:'Tempat gelas di cangkang belakang kiri-kanan',
@@ -747,7 +745,7 @@ loader.setDRACOLoader(draco);
    map material ditukar ke versi terang itu cuma selagi ada tint custom,
    lalu dikembalikan ke map asli saat direset -- lihat applyColor/resetPart. */
 let tintBaseTexture = null;
-new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126h', tex => {
+new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126o', tex => {
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   tintBaseTexture = tex;
@@ -779,7 +777,7 @@ function makeNetTexture(){
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
 /* jaring kini bagian dari model utama (objek Jaring_Kiri_* / Jaring_Kanan_* di twin-seat-meshy.glb), tidak ada file jaring terpisah lagi */
-loader.load('assets/twin-seat-meshy.glb?v=20261126n',
+loader.load('assets/twin-seat-meshy.glb?v=20261126o',
   async gltf => {
     model = gltf.scene;
 
