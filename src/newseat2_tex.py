@@ -1,7 +1,7 @@
 # Tekstur untuk seat Meshy baru: tint-base abu-abu (kulit rata + benang terang + serat halus) & normal map 2048.
 # Masukan: _tmp_tex/base.png, normal.png, classmap.npy  Keluaran: _tmp_tex/tint2048.jpg, tint2048.webp, normal2048.jpg, flatuv.json
 from PIL import Image
-import numpy as np, json
+import numpy as np, json, os
 from scipy.ndimage import gaussian_filter, binary_dilation, uniform_filter
 Image.MAX_IMAGE_PIXELS=None
 H=2048
@@ -14,9 +14,19 @@ B4=np.asarray(Image.open('_tmp_tex/base.png').convert('RGB')).astype(np.float32)
 beads=(L4-grey_opening(L4,size=(9,9)))>16
 band=binary_erosion(binary_dilation(beads,iterations=3),iterations=2)
 lab,n=label(band); cnt=np.bincount(lab.ravel()); keepc=cnt>=300; keepc[0]=False; band=keepc[lab]
-M2=np.asarray(Image.fromarray((band*255).astype(np.uint8)).resize((H,H),Image.BOX)).astype(np.float32)/255
-S=M2>0.4
-LEVEL,THREAD=0.80,1.0
+# pita tebal -> garis tengahnya (skeleton) -> dilebarkan tipis, supaya benang halus seperti di model 3D
+from skimage.morphology import skeletonize
+from scipy.ndimage import binary_fill_holes, convolve
+band=binary_fill_holes(band)
+band=gaussian_filter(band.astype(np.float32),3.0)>0.5          # haluskan tepi pita sebelum diambil garis tengahnya
+sk=skeletonize(band)
+K8=np.ones((3,3),int); K8[1,1]=0
+for _ in range(int(os.environ.get('PRUNE','30'))):             # buang cabang pendek (duri) hasil skeleton
+    nb=convolve(sk.astype(int),K8,mode='constant'); sk=sk&~((nb<=1))
+thin=binary_dilation(sk,iterations=int(os.environ.get('THREAD_W','3')))
+M2=np.asarray(Image.fromarray((thin*255).astype(np.uint8)).resize((H,H),Image.BOX)).astype(np.float32)/255
+S=M2>0.3
+LEVEL,THREAD=0.80,0.96
 tint=np.zeros(L.shape,np.float32)
 for c in range(3):
     sel=(C==c)&~S
@@ -40,6 +50,6 @@ y,x=np.unravel_index(score.argmin(),score.shape); print('flat patch',x,y,score.m
 json.dump({'x':int(x),'y':int(y),'w':w,'H':H},open('_tmp_tex/flatuv.json','w'))
 print('tint mean',tint.mean())
 # peta benang (putih=benang) untuk warna jahitan yang bisa diganti di situs (shader di dummy-kursi-twinseat.html)
-mask=np.clip((M2-0.15)/0.7,0,1)
+mask=np.clip(M2*1.8,0,1)
 Image.fromarray((mask*255).astype(np.uint8)).save('_tmp_tex/thread-mask.webp',quality=90)
 print('thread mask coverage',float((mask>0.5).mean()))

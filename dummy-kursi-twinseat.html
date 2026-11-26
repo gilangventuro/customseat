@@ -433,7 +433,7 @@ function applyColor(key, hex){
 }
 function resetPart(key){
   delete state.c[key];
-  if (key === 'stitch') { THREAD.uThread.value.set('#d9c8a8'); update(); return; }
+  if (key === 'stitch') { THREAD.uThread.value.set('#e9ddc2'); update(); return; }
   (matRefs[key]||[]).forEach((m, i) => {
     m.map = (origMap[key]||[])[i] || m.map;
     m.needsUpdate = true;
@@ -636,8 +636,8 @@ function renderAcc(){
   partsEl.appendChild(el);
 }
 /* benang jahitan (fitur warnanya sementara dimatikan): ikut warna Kulit Utama sedikit lebih gelap, supaya garis jahitan tampak halus dan tidak seperti kotoran di warna terang */
-const THREAD = {tThreadMask:{value:null}, uThread:{value:new THREE.Color('#d9c8a8')}};
-new THREE.TextureLoader().load('assets/textures/thread-mask.webp?v=20261126c', t => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; THREAD.tThreadMask.value = t; });
+const THREAD = {tThreadMask:{value:null}, uThread:{value:new THREE.Color('#e9ddc2')}};
+new THREE.TextureLoader().load('assets/textures/thread-mask.webp?v=20261126d', t => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; THREAD.tThreadMask.value = t; });
 /* benang jahitan ada di tekstur (peta benang), jadi warnanya diganti lewat shader: piksel benang dicampur ke warna benang */
 function threadify(m){
   m.onBeforeCompile = sh => {
@@ -728,7 +728,7 @@ loader.setDRACOLoader(draco);
    map material ditukar ke versi terang itu cuma selagi ada tint custom,
    lalu dikembalikan ke map asli saat direset -- lihat applyColor/resetPart. */
 let tintBaseTexture = null;
-new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126c', tex => {
+new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126d', tex => {
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   tintBaseTexture = tex;
@@ -760,7 +760,7 @@ function makeNetTexture(){
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
 /* jaring kini bagian dari model utama (objek Jaring_Kiri_* / Jaring_Kanan_* di twin-seat-meshy.glb), tidak ada file jaring terpisah lagi */
-loader.load('assets/twin-seat-meshy.glb?v=20261126e',
+loader.load('assets/twin-seat-meshy.glb?v=20261126f',
   async gltf => {
     model = gltf.scene;
 
@@ -821,7 +821,7 @@ loader.load('assets/twin-seat-meshy.glb?v=20261126e',
       });
     });
 
-    origHex.stitch = 'd9c8a8';
+    origHex.stitch = 'e9ddc2';
     overlay.style.display = 'none';
     renderParts();
   },
