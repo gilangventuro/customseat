@@ -637,7 +637,7 @@ function renderAcc(){
 }
 /* benang jahitan (fitur warnanya sementara dimatikan): ikut warna Kulit Utama sedikit lebih gelap, supaya garis jahitan tampak halus dan tidak seperti kotoran di warna terang */
 const THREAD = {tThreadMask:{value:null}, uThread:{value:new THREE.Color('#d9c8a8')}};
-new THREE.TextureLoader().load('assets/textures/thread-mask.webp?v=20261126b', t => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; THREAD.tThreadMask.value = t; });
+new THREE.TextureLoader().load('assets/textures/thread-mask.webp?v=20261126c', t => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; THREAD.tThreadMask.value = t; });
 /* benang jahitan ada di tekstur (peta benang), jadi warnanya diganti lewat shader: piksel benang dicampur ke warna benang */
 function threadify(m){
   m.onBeforeCompile = sh => {
@@ -728,7 +728,7 @@ loader.setDRACOLoader(draco);
    map material ditukar ke versi terang itu cuma selagi ada tint custom,
    lalu dikembalikan ke map asli saat direset -- lihat applyColor/resetPart. */
 let tintBaseTexture = null;
-new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126a', tex => {
+new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126c', tex => {
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   tintBaseTexture = tex;
@@ -760,7 +760,7 @@ function makeNetTexture(){
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
 /* jaring kini bagian dari model utama (objek Jaring_Kiri_* / Jaring_Kanan_* di twin-seat-meshy.glb), tidak ada file jaring terpisah lagi */
-loader.load('assets/twin-seat-meshy.glb?v=20261126d',
+loader.load('assets/twin-seat-meshy.glb?v=20261126e',
   async gltf => {
     model = gltf.scene;
 

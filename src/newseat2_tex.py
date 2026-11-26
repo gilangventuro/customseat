@@ -8,10 +8,14 @@ H=2048
 base=Image.open('_tmp_tex/base.png').convert('RGB').resize((H,H),Image.BOX)
 A=np.asarray(base).astype(np.float32); L=0.299*A[...,0]+0.587*A[...,1]+0.114*A[...,2]
 C=np.load('_tmp_tex/classmap.npy')
-thr={0:85,1:135,2:185}
-S=np.zeros(L.shape,bool)
-for c in range(3): S|=(C==c)&(L>thr[c])
-S=binary_dilation(S,iterations=1)
+# benang: deret manik terang di alur jahit (4096 px). White top-hat -> manik, lalu dilebarkan jadi pita menyambung, buang bercak kecil.
+from scipy.ndimage import grey_opening, binary_erosion, label
+B4=np.asarray(Image.open('_tmp_tex/base.png').convert('RGB')).astype(np.float32); L4=0.299*B4[...,0]+0.587*B4[...,1]+0.114*B4[...,2]
+beads=(L4-grey_opening(L4,size=(9,9)))>16
+band=binary_erosion(binary_dilation(beads,iterations=3),iterations=2)
+lab,n=label(band); cnt=np.bincount(lab.ravel()); keepc=cnt>=300; keepc[0]=False; band=keepc[lab]
+M2=np.asarray(Image.fromarray((band*255).astype(np.uint8)).resize((H,H),Image.BOX)).astype(np.float32)/255
+S=M2>0.4
 LEVEL,THREAD=0.80,1.0
 tint=np.zeros(L.shape,np.float32)
 for c in range(3):
@@ -36,6 +40,6 @@ y,x=np.unravel_index(score.argmin(),score.shape); print('flat patch',x,y,score.m
 json.dump({'x':int(x),'y':int(y),'w':w,'H':H},open('_tmp_tex/flatuv.json','w'))
 print('tint mean',tint.mean())
 # peta benang (putih=benang) untuk warna jahitan yang bisa diganti di situs (shader di dummy-kursi-twinseat.html)
-mask=np.clip(gaussian_filter(S.astype(np.float32),0.8)*1.6,0,1)
+mask=np.clip((M2-0.15)/0.7,0,1)
 Image.fromarray((mask*255).astype(np.uint8)).save('_tmp_tex/thread-mask.webp',quality=90)
 print('thread mask coverage',float((mask>0.5).mean()))
