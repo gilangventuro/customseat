@@ -189,6 +189,45 @@ def slab(name,x0,x1,y0,y1,z0,z1):
     keep.append(o)
 slab('Rangka_Dudukan_Kiri',-1.145,-0.045,-1.80,-0.76,0.571,0.60)
 slab('Rangka_Dudukan_Kanan',0.215,1.235,-1.80,-0.76,0.571,0.60)
+# ---- strip penutup celah samping: tepi bebas cangkang yang melayang 0,008-0,13 m dari permukaan sandaran dihubungkan ke permukaan itu dengan pita plastik hitam
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+blk2=blk.copy(); blk2.name='plastik_hitam_strip'; blk2.use_backface_culling=False
+GMIN=float(os.environ.get('GMIN','0.008')); GMAX=float(os.environ.get('GMAX','0.13'))
+for side in ('Kiri','Kanan'):
+    sh=bpy.data.objects['Sandaran_Belakang_%s_02'%side]; st=bpy.data.objects['Kursi_%s'%side]
+    sw=W(st); st.data.calc_loop_triangles()
+    bvh=BVHTree.FromPolygons([Vector(v) for v in sw],[tuple(t.vertices) for t in st.data.loop_triangles])
+    bm=bmesh.new(); bm.from_mesh(sh.data); bm.transform(sh.matrix_world)
+    bmesh.ops.remove_doubles(bm,verts=bm.verts[:],dist=1e-5)
+    def tgt(v):
+        loc,nrm,_,dd=bvh.find_nearest(v)
+        if loc is None or not (GMIN<=dd<=GMAX) or (v-loc).dot(nrm)<0: return None
+        return loc-nrm*0.006
+    cache={}
+    gm=bmesh.new(); gv={}
+    def gvert(key,co):
+        if key not in gv: gv[key]=gm.verts.new(co)
+        return gv[key]
+    nq=0
+    for e in bm.edges:
+        if not e.is_boundary: continue
+        a,b=e.verts
+        for v in (a,b):
+            if v.index not in cache: cache[v.index]=tgt(v.co)
+        ta,tb=cache[a.index],cache[b.index]
+        if ta is None or tb is None: continue
+        if (a.co-b.co).length>0.05: continue
+        q=[gvert(('s',a.index),a.co.copy()),gvert(('s',b.index),b.co.copy()),gvert(('t',b.index),tb),gvert(('t',a.index),ta)]
+        try:
+            gm.faces.new(q); nq+=1
+        except ValueError: pass
+    log('strip',side,'segmen',nq,'tepi',sum(1 for e in bm.edges if e.is_boundary),'titik-ok',sum(1 for v in cache.values() if v is not None),'dari',len(cache))
+    bm.free()
+    me=bpy.data.meshes.new('Sandaran_Penutup_%s'%side); gm.to_mesh(me); gm.free()
+    o=bpy.data.objects.new('Sandaran_Penutup_%s'%side,me); bpy.context.scene.collection.objects.link(o); me.materials.append(blk2)
+    for pl in me.polygons: pl.use_smooth=True
+    keep.append(o)
 # ---- buang semua yang bukan bagian model baru, lalu ekspor
 final={o.name for o in keep}
 for o in list(bpy.data.objects):
