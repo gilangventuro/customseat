@@ -232,6 +232,19 @@ for side in ('Kiri','Kanan'):
         ww=W(o2)
         for k in range(3): ww[:,k]+=np.interp(ww[:,2],zb,F[:,k])
         setW(o2,ww)
+    # titik cangkang yang menembus ke dalam badan kursi didorong keluar ke permukaan -> garis temu bersih, tidak bergerigi
+    ws=W(sh); nfix=0
+    for i,p in enumerate(ws):
+        loc,nrm,_,dd=bvh.find_nearest(Vector(p))
+        if loc is not None and dd<0.012 and (Vector(p)-loc).dot(nrm)<0:
+            ws[i]=np.array(loc+nrm*0.004); nfix+=1
+    setW(sh,ws); log('tembus diperbaiki',side,nfix)
+    # alas hitam tepat di belakang jaring: menutupi dudukan bulat & badan kursi yang tembus pandang lewat anyaman
+    nt=bpy.data.objects['Jaring_%s_Net'%side]
+    d=nt.copy(); d.data=nt.data.copy(); bpy.context.scene.collection.objects.link(d); d.name='Jaring_%s_Alas'%side; d.data.name=d.name
+    d.data.materials.clear(); d.data.materials.append(blk)
+    for u in list(d.data.uv_layers): d.data.uv_layers.remove(u)
+    wd=W(d); wd[:,1]-=float(os.environ.get('ALAS_DY','0.006')); setW(d,wd); keep.append(d)
 # ---- buang semua yang bukan bagian model baru, lalu ekspor
 final={o.name for o in keep}
 for o in list(bpy.data.objects):
