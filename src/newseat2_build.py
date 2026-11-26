@@ -226,9 +226,9 @@ for side in ('Kiri','Kanan'):
         if m.sum()>=20: F[i]=np.median(V[m,1:],axis=0); okb[i]=True
     for k in range(3): F[:,k]=np.interp(zb,zb[okb],F[okb,k])
     for _ in range(3): F=np.vstack([F[:1],(F[:-2]+2*F[1:-1]+F[2:])/4,F[-1:]])
-    F*=float(os.environ.get('RIM_GAIN','0.45'))
+    F*=float(os.environ.get('RIM_GAIN','0.28'))
     log('geser',side,'maks',np.abs(F).max(0).round(3).tolist(),'z0.9',F[4].round(3).tolist(),'z1.7',F[20].round(3).tolist())
-    for o2 in [sh]+[bpy.data.objects[n] for n in ('Jaring_%s_Bingkai'%side,'Jaring_%s_Karet'%side,'Jaring_%s_Net'%side)]:
+    for o2 in [sh]+[bpy.data.objects[n] for n in ('Jaring_%s_Bingkai'%side,'Jaring_%s_Karet'%side,'Jaring_%s_Net'%side,'Cupholder_%s_00'%side,'Handle_%s_00'%side) if n in bpy.data.objects]:
         ww=W(o2)
         for k in range(3): ww[:,k]+=np.interp(ww[:,2],zb,F[:,k])
         setW(o2,ww)
