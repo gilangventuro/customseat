@@ -200,51 +200,7 @@ def slab(name,x0,x1,y0,y1,z0,z1):
     keep.append(o)
 slab('Rangka_Dudukan_Kiri',-1.145,-0.045,-1.80,-0.76,0.571,0.60)
 slab('Rangka_Dudukan_Kanan',0.215,1.235,-1.80,-0.76,0.571,0.60)
-# ---- tepi cangkang belakang ditekuk halus sampai benar-benar menempel ke permukaan sandaran (kiri & kanan)
-from mathutils import Vector, kdtree
-from mathutils.bvhtree import BVHTree
-RIM_R=float(os.environ.get('RIM_R','0.07')); RIM_MAXD=float(os.environ.get('RIM_MAXD','0.15')); SMR=float(os.environ.get('SMR','0.05'))
-for side in ('Kiri','Kanan'):
-    sh=bpy.data.objects['Sandaran_Belakang_%s_02'%side]; st=bpy.data.objects['Kursi_%s'%side]
-    sw=W(st); st.data.calc_loop_triangles()
-    bvh=BVHTree.FromPolygons([Vector(v) for v in sw],[tuple(t.vertices) for t in st.data.loop_triangles])
-    w=W(sh); bm=bmesh.new(); bm.from_mesh(sh.data); bm.transform(sh.matrix_world)
-    bmesh.ops.remove_doubles(bm,verts=bm.verts[:],dist=1e-5)
-    bpts=[]
-    for v in bm.verts:
-        if not any(e.is_boundary for e in v.link_edges): continue
-        loc,nrm,_,dd=bvh.find_nearest(v.co)
-        if loc is not None and dd<=RIM_MAXD and (v.co-loc).dot(nrm)>=0: bpts.append(v.co.copy())   # hanya tepi yang memang dekat sandaran (bukan lubang jaring/dalam)
-    bm.free(); log('tepi dekat',side,len(bpts))
-    # medan geser halus per ketinggian (z): median vektor tepi->permukaan sandaran, dihaluskan, lalu seluruh cangkang + jaringnya digeser (tidak bergerigi)
-    V=[]
-    for q in bpts:
-        loc,nrm,_,dd=bvh.find_nearest(Vector(q)); V.append([q[2]]+list((loc-nrm*0.004)-q))
-    V=np.array(V); zb=np.arange(0.70,2.45,0.05); F=np.zeros((len(zb),3)); okb=np.zeros(len(zb),bool)
-    for i,z0 in enumerate(zb):
-        m=np.abs(V[:,0]-z0)<0.05
-        if m.sum()>=20: F[i]=np.median(V[m,1:],axis=0); okb[i]=True
-    for k in range(3): F[:,k]=np.interp(zb,zb[okb],F[okb,k])
-    for _ in range(3): F=np.vstack([F[:1],(F[:-2]+2*F[1:-1]+F[2:])/4,F[-1:]])
-    F*=float(os.environ.get('RIM_GAIN','0.28'))
-    log('geser',side,'maks',np.abs(F).max(0).round(3).tolist(),'z0.9',F[4].round(3).tolist(),'z1.7',F[20].round(3).tolist())
-    for o2 in [sh]+[bpy.data.objects[n] for n in ('Jaring_%s_Bingkai'%side,'Jaring_%s_Karet'%side,'Jaring_%s_Net'%side,'Cupholder_%s_00'%side,'Handle_%s_00'%side) if n in bpy.data.objects]:
-        ww=W(o2)
-        for k in range(3): ww[:,k]+=np.interp(ww[:,2],zb,F[:,k])
-        setW(o2,ww)
-    # titik cangkang yang menembus ke dalam badan kursi didorong keluar ke permukaan -> garis temu bersih, tidak bergerigi
-    ws=W(sh); nfix=0
-    for i,p in enumerate(ws):
-        loc,nrm,_,dd=bvh.find_nearest(Vector(p))
-        if loc is not None and dd<0.012 and (Vector(p)-loc).dot(nrm)<0:
-            ws[i]=np.array(loc+nrm*0.004); nfix+=1
-    setW(sh,ws); log('tembus diperbaiki',side,nfix)
-    # alas hitam tepat di belakang jaring: menutupi dudukan bulat & badan kursi yang tembus pandang lewat anyaman
-    nt=bpy.data.objects['Jaring_%s_Net'%side]
-    d=nt.copy(); d.data=nt.data.copy(); bpy.context.scene.collection.objects.link(d); d.name='Jaring_%s_Alas'%side; d.data.name=d.name
-    d.data.materials.clear(); d.data.materials.append(blk)
-    for u in list(d.data.uv_layers): d.data.uv_layers.remove(u)
-    wd=W(d); wd[:,1]-=float(os.environ.get('ALAS_DY','0.006')); setW(d,wd); keep.append(d)
+# (penyesuaian cangkang/alas jaring dibatalkan atas permintaan user: cangkang, cupholder & jaring tetap seperti di file Blender)
 # ---- buang semua yang bukan bagian model baru, lalu ekspor
 final={o.name for o in keep}
 for o in list(bpy.data.objects):
