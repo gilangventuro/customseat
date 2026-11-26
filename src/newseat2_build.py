@@ -88,6 +88,17 @@ for k in ('Mesh_0','Mesh_0.001'):
         idx=np.minimum(st+j,len(ua)-1); pj=ua[idx]*0.7+cen*0.3; c=samp(pj)
         ok=cnt>j; votes[np.arange(len(cnt))[ok],c[ok]]+=1
     fc=votes.argmax(1).astype(np.int32)
+    # haluskan kelas per-face: face yang kelasnya terisolasi (mayoritas tetangga sisi sama berkelas lain) ikut tetangganya -> tepi list rapi
+    _bm=bmesh.new(); _bm.from_mesh(me); _bm.faces.ensure_lookup_table()
+    nb=[[f2.index for e in f.edges for f2 in e.link_faces if f2 is not f] for f in _bm.faces]; _bm.free()
+    for _ in range(3):
+        nf=fc.copy()
+        for i,l in enumerate(nb):
+            if len(l)<3: continue
+            cc=np.bincount(fc[l],minlength=3); m=cc.argmax()
+            if m!=fc[i] and cc[m]>=len(l)-0 and cc[fc[i]]==0: nf[i]=m
+            elif m!=fc[i] and cc[m]>=len(l)-1 and cc[fc[i]]<=1 and len(l)>=3: nf[i]=m
+        fc=nf
     me.materials.clear()
     for nm in ('leather_main','leather_pattern','leather_accent'): me.materials.append(LM[nm])
     me.polygons.foreach_set('material_index',fc)
@@ -189,45 +200,38 @@ def slab(name,x0,x1,y0,y1,z0,z1):
     keep.append(o)
 slab('Rangka_Dudukan_Kiri',-1.145,-0.045,-1.80,-0.76,0.571,0.60)
 slab('Rangka_Dudukan_Kanan',0.215,1.235,-1.80,-0.76,0.571,0.60)
-# ---- strip penutup celah samping: tepi bebas cangkang yang melayang 0,008-0,13 m dari permukaan sandaran dihubungkan ke permukaan itu dengan pita plastik hitam
-from mathutils import Vector
+# ---- tepi cangkang belakang ditekuk halus sampai benar-benar menempel ke permukaan sandaran (kiri & kanan)
+from mathutils import Vector, kdtree
 from mathutils.bvhtree import BVHTree
-blk2=blk.copy(); blk2.name='plastik_hitam_strip'; blk2.use_backface_culling=False
-GMIN=float(os.environ.get('GMIN','0.008')); GMAX=float(os.environ.get('GMAX','0.13'))
+RIM_R=float(os.environ.get('RIM_R','0.07')); RIM_MAXD=float(os.environ.get('RIM_MAXD','0.15')); SMR=float(os.environ.get('SMR','0.05'))
 for side in ('Kiri','Kanan'):
     sh=bpy.data.objects['Sandaran_Belakang_%s_02'%side]; st=bpy.data.objects['Kursi_%s'%side]
     sw=W(st); st.data.calc_loop_triangles()
     bvh=BVHTree.FromPolygons([Vector(v) for v in sw],[tuple(t.vertices) for t in st.data.loop_triangles])
-    bm=bmesh.new(); bm.from_mesh(sh.data); bm.transform(sh.matrix_world)
+    w=W(sh); bm=bmesh.new(); bm.from_mesh(sh.data); bm.transform(sh.matrix_world)
     bmesh.ops.remove_doubles(bm,verts=bm.verts[:],dist=1e-5)
-    def tgt(v):
-        loc,nrm,_,dd=bvh.find_nearest(v)
-        if loc is None or not (GMIN<=dd<=GMAX) or (v-loc).dot(nrm)<0: return None
-        return loc-nrm*0.006
-    cache={}
-    gm=bmesh.new(); gv={}
-    def gvert(key,co):
-        if key not in gv: gv[key]=gm.verts.new(co)
-        return gv[key]
-    nq=0
-    for e in bm.edges:
-        if not e.is_boundary: continue
-        a,b=e.verts
-        for v in (a,b):
-            if v.index not in cache: cache[v.index]=tgt(v.co)
-        ta,tb=cache[a.index],cache[b.index]
-        if ta is None or tb is None: continue
-        if (a.co-b.co).length>0.05: continue
-        q=[gvert(('s',a.index),a.co.copy()),gvert(('s',b.index),b.co.copy()),gvert(('t',b.index),tb),gvert(('t',a.index),ta)]
-        try:
-            gm.faces.new(q); nq+=1
-        except ValueError: pass
-    log('strip',side,'segmen',nq,'tepi',sum(1 for e in bm.edges if e.is_boundary),'titik-ok',sum(1 for v in cache.values() if v is not None),'dari',len(cache))
-    bm.free()
-    me=bpy.data.meshes.new('Sandaran_Penutup_%s'%side); gm.to_mesh(me); gm.free()
-    o=bpy.data.objects.new('Sandaran_Penutup_%s'%side,me); bpy.context.scene.collection.objects.link(o); me.materials.append(blk2)
-    for pl in me.polygons: pl.use_smooth=True
-    keep.append(o)
+    bpts=[]
+    for v in bm.verts:
+        if not any(e.is_boundary for e in v.link_edges): continue
+        loc,nrm,_,dd=bvh.find_nearest(v.co)
+        if loc is not None and dd<=RIM_MAXD and (v.co-loc).dot(nrm)>=0: bpts.append(v.co.copy())   # hanya tepi yang memang dekat sandaran (bukan lubang jaring/dalam)
+    bm.free(); log('tepi dekat',side,len(bpts))
+    # medan geser halus per ketinggian (z): median vektor tepi->permukaan sandaran, dihaluskan, lalu seluruh cangkang + jaringnya digeser (tidak bergerigi)
+    V=[]
+    for q in bpts:
+        loc,nrm,_,dd=bvh.find_nearest(Vector(q)); V.append([q[2]]+list((loc-nrm*0.004)-q))
+    V=np.array(V); zb=np.arange(0.70,2.45,0.05); F=np.zeros((len(zb),3)); okb=np.zeros(len(zb),bool)
+    for i,z0 in enumerate(zb):
+        m=np.abs(V[:,0]-z0)<0.05
+        if m.sum()>=20: F[i]=np.median(V[m,1:],axis=0); okb[i]=True
+    for k in range(3): F[:,k]=np.interp(zb,zb[okb],F[okb,k])
+    for _ in range(3): F=np.vstack([F[:1],(F[:-2]+2*F[1:-1]+F[2:])/4,F[-1:]])
+    F*=float(os.environ.get('RIM_GAIN','0.45'))
+    log('geser',side,'maks',np.abs(F).max(0).round(3).tolist(),'z0.9',F[4].round(3).tolist(),'z1.7',F[20].round(3).tolist())
+    for o2 in [sh]+[bpy.data.objects[n] for n in ('Jaring_%s_Bingkai'%side,'Jaring_%s_Karet'%side,'Jaring_%s_Net'%side)]:
+        ww=W(o2)
+        for k in range(3): ww[:,k]+=np.interp(ww[:,2],zb,F[:,k])
+        setW(o2,ww)
 # ---- buang semua yang bukan bagian model baru, lalu ekspor
 final={o.name for o in keep}
 for o in list(bpy.data.objects):

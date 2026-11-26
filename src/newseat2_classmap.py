@@ -14,7 +14,17 @@ unk=cls==255
 print('unknown frac',unk.mean())
 idx=distance_transform_edt(unk,return_distances=False,return_indices=True)
 cls=cls[idx[0],idx[1]]
-cls=median_filter(cls,size=3)
+cls=median_filter(cls,size=5)
+# buang pulau kecil (bintik kelas lain di dalam list/panel): komponen < MIN px dilebur ke kelas sekitarnya; diulang 2x
+from scipy.ndimage import label
+MIN=700
+for _ in range(2):
+    for c in range(3):
+        lab,n=label(cls==c); cnt=np.bincount(lab.ravel()); small=(cnt<MIN); small[0]=False
+        sm=small[lab]
+        if sm.any():
+            keepm=~sm; idx=distance_transform_edt(~keepm,return_distances=False,return_indices=True)
+            cls=cls[idx[0],idx[1]]
 print('frac',[(cls==c).mean().round(3) for c in range(3)])
 np.save('_tmp_tex/classmap.npy',cls)
 vis=np.zeros(cls.shape+(3,),np.uint8); vis[cls==0]=(20,20,30); vis[cls==1]=(150,90,60); vis[cls==2]=(60,200,190)
