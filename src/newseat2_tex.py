@@ -18,7 +18,7 @@ lab,n=label(band); cnt=np.bincount(lab.ravel()); keepc=cnt>=300; keepc[0]=False;
 from skimage.morphology import skeletonize
 from scipy.ndimage import binary_fill_holes, convolve
 band=binary_fill_holes(band)
-band=gaussian_filter(band.astype(np.float32),3.0)>0.5          # haluskan tepi pita sebelum diambil garis tengahnya
+band=gaussian_filter(band.astype(np.float32),5.0)>0.5          # haluskan tepi pita sebelum diambil garis tengahnya
 sk=skeletonize(band)
 K8=np.ones((3,3),int); K8[1,1]=0
 for _ in range(int(os.environ.get('PRUNE','30'))):             # buang cabang pendek (duri) hasil skeleton
@@ -53,3 +53,19 @@ print('tint mean',tint.mean())
 mask=np.clip(M2*1.8,0,1)
 Image.fromarray((mask*255).astype(np.uint8)).save('_tmp_tex/thread-mask.webp',quality=90)
 print('thread mask coverage',float((mask>0.5).mean()))
+
+# albedo asli (2048) untuk tampilan bawaan = seperti di Blender; dan tambalan datar per kelas untuk bantalan legrest (tanpa UV)
+base.save('_tmp_tex/base2048.jpg',quality=90)
+patches={}
+Lg=0.299*A[...,0]+0.587*A[...,1]+0.114*A[...,2]
+for c in range(3):
+    for w in (28,22,16):
+        okc=uniform_filter((C==c).astype(np.float32),w)>0.999
+        okc[:64]=False; okc[-64:]=False; okc[:,:64]=False; okc[:,-64:]=False
+        if not okc.any(): continue
+        vL=uniform_filter(Lg**2,w)-uniform_filter(Lg,w)**2
+        nvv=sum(uniform_filter(N[...,k]**2,w)-uniform_filter(N[...,k],w)**2 for k in range(3))
+        sc=np.where(okc,vL/(vL[okc].mean()+1e-9)+nvv/(nvv[okc].mean()+1e-9),1e9)
+        y,x=np.unravel_index(sc.argmin(),sc.shape); patches[c]={'x':int(x),'y':int(y),'w':w}; break
+print('patches',patches)
+json.dump({'H':H,'patches':patches},open('_tmp_tex/flatuv2.json','w'))

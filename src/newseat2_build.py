@@ -55,7 +55,7 @@ for o in list(bpy.data.objects):
 # ---- bahan kulit bertekstur baru
 for nm in ('leather_main','leather_pattern','leather_accent','leather_stitch'):
     if nm in bpy.data.materials: bpy.data.materials[nm].name='old_'+nm
-tint=bpy.data.images.load(P+'_tmp_tex/tint2048.jpg'); tint.colorspace_settings.name='sRGB'
+tint=bpy.data.images.load(P+'_tmp_tex/base2048.jpg'); tint.colorspace_settings.name='sRGB'   # albedo asli (warna bawaan = seperti di Blender); tint-base abu-abu dimuat terpisah oleh situs
 nrm=bpy.data.images.load(P+'_tmp_tex/normal2048.jpg'); nrm.colorspace_settings.name='Non-Color'
 def leather(nm):
     m=bpy.data.materials.new(nm); m.use_nodes=True; nt=m.node_tree
@@ -67,7 +67,7 @@ def leather(nm):
     b.inputs['Metallic'].default_value=0; b.inputs['Roughness'].default_value=0.55
     m.diffuse_color=(0.2,0.2,0.2,1); return m
 LM={nm:leather(nm) for nm in ('leather_main','leather_pattern','leather_accent')}
-CL=np.load(P+'_tmp_tex/classmap.npy'); H=CL.shape[0]; FL=json.load(open(P+'_tmp_tex/flatuv.json'))
+CL=np.load(P+'_tmp_tex/classmap.npy'); H=CL.shape[0]; FL=json.load(open(P+'_tmp_tex/flatuv2.json'))
 # ---- badan kursi baru: decimate + kelas per-face dari peta kelas tekstur
 for k in ('Mesh_0','Mesh_0.001'):
     o=bpy.data.objects[k]; nn=canon[k]; o.name=nn; o.data.name=nn
@@ -131,8 +131,16 @@ for nn in ('Footrest_Kiri_Bantalan','Footrest_Kanan_Bantalan'):
     for u in list(me.uv_layers): me.uv_layers.remove(u)
     uv=me.uv_layers.new(name='UVMap')
     w=W(o); li=np.zeros(len(me.loops),dtype=np.int32); me.loops.foreach_get('vertex_index',li)
+    cnt=np.zeros(len(me.polygons),dtype=np.int32); me.polygons.foreach_get('loop_total',cnt)
+    pm=np.zeros(len(me.polygons),dtype=np.int32); me.polygons.foreach_get('material_index',pm)
+    lc=np.repeat(pm,cnt)   # kelas per loop (0 utama, 1 motif, 2 list) -> tambalan datar warna asli kelas itu
+    names_=[m.name if m else '' for m in me.materials]
+    cls=np.array([{'leather_main':0,'leather_pattern':1,'leather_accent':2}.get(names_[i],0) for i in range(len(names_))])[lc]
     p=w[li][:,:2]; mn=w[:,:2].min(0); mx=w[:,:2].max(0); q=(p-mn)/(mx-mn)-0.5
-    S=0.010; u=(FL['x']+0.5)/H+q[:,0]*S; v=1-(FL['y']+0.5)/H+q[:,1]*S
+    u=np.zeros(len(li)); v=np.zeros(len(li))
+    for c in range(3):
+        pc=FL['patches'][str(c)]; S=0.7*pc['w']/H; m=cls==c
+        u[m]=(pc['x']+0.5)/H+q[m,0]*S; v[m]=1-(pc['y']+0.5)/H+q[m,1]*S
     uv.data.foreach_set('uv',np.stack([u,v],1).ravel())
 # ---- perbaikan yang sudah disepakati sebelumnya (diterapkan ulang pada geometri klaster 2)
 blk=canonmat['plastik_hitam']; alu=canonmat['aluminium']

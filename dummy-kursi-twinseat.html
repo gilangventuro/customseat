@@ -420,12 +420,27 @@ function updateFlash(){
   });
 }
 
+const isLeatherMat = m => /^leather_(main|pattern|accent)$/.test(m.name);
+/* mode ASLI: tekstur asli (warna & benang persis seperti di Blender). Mode TINT: tekstur abu-abu x warna pilihan + benang berwarna dari peta benang */
+function tintMode(m, hex){
+  if (tintBaseTexture && m.map && m.map !== tintBaseTexture) m.map = tintBaseTexture;
+  m.color.set(hex); if (m.userData.thr) m.userData.thr.value = 1; m.needsUpdate = true;
+}
+function origMode(m){
+  if (m.userData.origMapTex) m.map = m.userData.origMapTex;
+  m.color.set('#ffffff'); if (m.userData.thr) m.userData.thr.value = 0; m.needsUpdate = true;
+}
+const leatherPairs = () => { const a = []; ['main','pattern','accent'].forEach(k => (matRefs[k]||[]).forEach(m => a.push([k, m]))); return a; };
 function applyColor(key, hex){
   state.c[key] = hex;
-  if (key === 'stitch') { THREAD.uThread.value.set(hex); update(); toast('Warna Jahitan diubah'); return; }
+  if (key === 'stitch') {
+    THREAD.uThread.value.set(hex);
+    leatherPairs().forEach(([k, m]) => { if (!state.c[k]) tintMode(m, DEFAULT_COLORS[k]); });
+    update(); toast('Warna Jahitan diubah'); return;
+  }
   (matRefs[key]||[]).forEach(m => {
     if (findPart(key).woodMode) { m.map = greyWoodTex(m.map); m.color.set(hex); m.needsUpdate = true; return; }
-    if (tintBaseTexture && m.map) { m.map = tintBaseTexture; m.needsUpdate = true; }   /* benang jahitan = warna polos, tanpa tekstur */
+    if (isLeatherMat(m)) { tintMode(m, hex); return; }
     m.color.set(hex);
   });
   update();
@@ -433,8 +448,13 @@ function applyColor(key, hex){
 }
 function resetPart(key){
   delete state.c[key];
-  if (key === 'stitch') { THREAD.uThread.value.set('#e9ddc2'); update(); return; }
+  if (key === 'stitch') {
+    THREAD.uThread.value.set('#e9ddc2');
+    if (!['main','pattern','accent'].some(k => state.c[k])) leatherPairs().forEach(([k, m]) => origMode(m));
+    update(); return;
+  }
   (matRefs[key]||[]).forEach((m, i) => {
+    if (isLeatherMat(m)) { if (state.c.stitch) tintMode(m, DEFAULT_COLORS[key]); else origMode(m); return; }
     m.map = (origMap[key]||[])[i] || m.map;
     m.needsUpdate = true;
     m.color.set('#'+origHex[key]);
@@ -478,7 +498,7 @@ function renderParts(){
   renderLogo();
 }
 function applyPreset(pr){
-  Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (tintBaseTexture && m.map) { m.map = tintBaseTexture; m.needsUpdate = true; } m.color.set(h); }); });
+  Object.entries(pr.c).forEach(([k,h]) => { state.c[k] = h; (matRefs[k]||[]).forEach(m => { if (isLeatherMat(m)) tintMode(m, h); else m.color.set(h); }); });
   update(); toast(pr.name+' diterapkan');
 }
 const presetMatch = pr => Object.keys(pr.c).every(k => pr.c[k]===state.c[k]);
@@ -637,14 +657,14 @@ function renderAcc(){
 }
 /* benang jahitan (fitur warnanya sementara dimatikan): ikut warna Kulit Utama sedikit lebih gelap, supaya garis jahitan tampak halus dan tidak seperti kotoran di warna terang */
 const THREAD = {tThreadMask:{value:null}, uThread:{value:new THREE.Color('#e9ddc2')}};
-new THREE.TextureLoader().load('assets/textures/thread-mask.webp?v=20261126d', t => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; THREAD.tThreadMask.value = t; });
+new THREE.TextureLoader().load('assets/textures/thread-mask.webp?v=20261126e', t => { t.flipY = false; t.colorSpace = THREE.NoColorSpace; THREAD.tThreadMask.value = t; });
 /* benang jahitan ada di tekstur (peta benang), jadi warnanya diganti lewat shader: piksel benang dicampur ke warna benang */
 function threadify(m){
   m.onBeforeCompile = sh => {
-    sh.uniforms.tThreadMask = THREAD.tThreadMask; sh.uniforms.uThread = THREAD.uThread;
+    sh.uniforms.tThreadMask = THREAD.tThreadMask; sh.uniforms.uThread = THREAD.uThread; sh.uniforms.uThreadOn = m.userData.thr;
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D tThreadMask;\nuniform vec3 uThread;')
-      .replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\n diffuseColor.rgb = mix(diffuseColor.rgb, uThread, texture2D(tThreadMask, vMapUv).r);\n#endif');
+      .replace('#include <common>', '#include <common>\nuniform sampler2D tThreadMask;\nuniform vec3 uThread;\nuniform float uThreadOn;')
+      .replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\n diffuseColor.rgb = mix(diffuseColor.rgb, uThread, texture2D(tThreadMask, vMapUv).r * uThreadOn);\n#endif');
   };
   m.customProgramCacheKey = () => 'thread1';
   m.needsUpdate = true;
@@ -728,7 +748,7 @@ loader.setDRACOLoader(draco);
    map material ditukar ke versi terang itu cuma selagi ada tint custom,
    lalu dikembalikan ke map asli saat direset -- lihat applyColor/resetPart. */
 let tintBaseTexture = null;
-new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126d', tex => {
+new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126e', tex => {
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   tintBaseTexture = tex;
@@ -760,7 +780,7 @@ function makeNetTexture(){
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
 /* jaring kini bagian dari model utama (objek Jaring_Kiri_* / Jaring_Kanan_* di twin-seat-meshy.glb), tidak ada file jaring terpisah lagi */
-loader.load('assets/twin-seat-meshy.glb?v=20261126f',
+loader.load('assets/twin-seat-meshy.glb?v=20261126g',
   async gltf => {
     model = gltf.scene;
 
@@ -810,13 +830,14 @@ loader.load('assets/twin-seat-meshy.glb?v=20261126f',
       const mats = Array.isArray(n.material) ? n.material : [n.material];
       mats.forEach(m => {
         if (m.name === 'leather_stitch' && !threadMats.includes(m)) { m.userData.origColor = m.color.clone(); threadMats.push(m); }
-        if (/^leather_(main|pattern|accent)$/.test(m.name) && !m.userData.threadified) { m.userData.threadified = true; threadify(m); }
+        if (/^leather_(main|pattern|accent)$/.test(m.name) && !m.userData.threadified) { m.userData.threadified = true; m.userData.origMapTex = m.map; m.userData.thr = {value:0}; threadify(m); }
         const p = findPartByMat(m.name);
         if (!p) return;
-        if (DEFAULT_COLORS[p.key]) m.color.set(DEFAULT_COLORS[p.key]);   /* warna bawaan ("ASLI") */
+        if (isLeatherMat(m)) m.color.set('#ffffff');
+        else if (DEFAULT_COLORS[p.key]) m.color.set(DEFAULT_COLORS[p.key]);   /* warna bawaan ("ASLI") */
         matRefs[p.key].push(m);
         origMap[p.key].push(m.map);
-        if (origHex[p.key] === undefined) origHex[p.key] = m.color.getHexString();
+        if (origHex[p.key] === undefined) origHex[p.key] = isLeatherMat(m) ? DEFAULT_COLORS[p.key].slice(1) : m.color.getHexString();
         if (origEmissive[p.key] === undefined) origEmissive[p.key] = m.emissive.clone();
       });
     });
