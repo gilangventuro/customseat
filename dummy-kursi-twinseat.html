@@ -386,7 +386,7 @@ const PARTS3D = [
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
 /* warna bawaan kursi: kulit utama hitam, motif abu-slate, list aksen teal, handle & cup holder hitam */
-const DEFAULT_COLORS = {main:'#1b1c1f', pattern:'#3a3e44', accent:'#1f5557', handle:'#1b1c1f', cupholder:'#1b1c1f'};
+const DEFAULT_COLORS = {main:'#1b1c1f', pattern:'#6b4636', accent:'#3fa79b', handle:'#1b1c1f', cupholder:'#1b1c1f'};
 
 const allPal = [...LEATHER];
 const nameOf = (hex, pal) => { if(!hex) return 'Warna asli'; const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase()); return f?f[0]:'Custom'; };
@@ -715,7 +715,7 @@ loader.setDRACOLoader(draco);
    map material ditukar ke versi terang itu cuma selagi ada tint custom,
    lalu dikembalikan ke map asli saat direset -- lihat applyColor/resetPart. */
 let tintBaseTexture = null;
-new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261123b', tex => {
+new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261126a', tex => {
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   tintBaseTexture = tex;
@@ -746,8 +746,8 @@ function makeNetTexture(){
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(1/0.028, 1/0.028); t.anisotropy = 8; return t;
 }
-const netPromise = loader.loadAsync('assets/net-pocket.glb?v=20261124c').catch(() => null);
-loader.load('assets/twin-seat-meshy.glb?v=20261125o',
+const netPromise = loader.loadAsync('assets/net-pocket.glb?v=20261126a').catch(() => null);
+loader.load('assets/twin-seat-meshy.glb?v=20261126a',
   async gltf => {
     model = gltf.scene;
 
@@ -775,7 +775,6 @@ loader.load('assets/twin-seat-meshy.glb?v=20261125o',
         if (!n.isMesh) return;
         if (n.name.endsWith('_Net')) n.material = netMat; else n.material.side = THREE.DoubleSide;
       });
-      net.scene.position.y -= 0.1167;   /* kursi diturunkan 0,1167 m di file Blender (UPDATE 2) agar menempel rangka; jaring ikut turun */
       model.add(net.scene);
     }
 
