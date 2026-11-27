@@ -70,6 +70,11 @@ def leather(nm):
     b.inputs['Metallic'].default_value=0; b.inputs['Roughness'].default_value=0.55
     m.diffuse_color=(0.2,0.2,0.2,1); return m
 LM={nm:leather(nm) for nm in ('leather_main','leather_pattern','leather_accent')}
+# logam (tutup engsel armrest ber-logo, dll.): situs tanpa peta lingkungan -> logam penuh tampak hitam; turunkan metalik agar terlihat abu perak seperti di Blender
+for _n,_mv in (('baja',0.25),('aluminium',0.25)):
+    _m=canonmat.get(_n)
+    if _m is not None and _m.use_nodes:
+        for _b in [x for x in _m.node_tree.nodes if x.type=='BSDF_PRINCIPLED']: _b.inputs['Metallic'].default_value=_mv
 CL=np.load(P+'_tmp_tex/classmap.npy'); H=CL.shape[0]; FL=json.load(open(P+'_tmp_tex/flatuv2.json'))
 # ---- badan kursi baru: decimate + kelas per-face dari peta kelas tekstur
 from mathutils import kdtree
