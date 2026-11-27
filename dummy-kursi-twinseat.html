@@ -208,6 +208,20 @@ const hint = document.getElementById('hint');
 const stage = document.querySelector('.view');
 
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+/* krom perak: logam penuh + peta lingkungan gradasi studio (tanpa peta lingkungan logam tampak hitam; tanpa metalik tampak putih) */
+const CHROME_ENV = (() => {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, '#f4f7fa'); gr.addColorStop(0.42, '#aeb7c0'); gr.addColorStop(0.5, '#e8edf2'); gr.addColorStop(0.56, '#2a2f35'); gr.addColorStop(1, '#0d0f12');
+  g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = 'rgba(255,255,255,.95)'; [[40, 14], [150, 10], [270, 16], [380, 10], [470, 14]].forEach(([x, w]) => g.fillRect(x, 20, w, 90));
+  g.fillStyle = 'rgba(0,0,0,.55)'; [[100, 18], [330, 22]].forEach(([x, w]) => g.fillRect(x, 125, w, 70));
+  const t = new THREE.CanvasTexture(c); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+function applyChrome(m){
+  if (m.name !== 'baja' && m.name !== 'aluminium') return;
+  m.metalness = 1; m.roughness = 0.22; m.envMap = CHROME_ENV; m.envMapIntensity = 1.1; m.color.set('#e3e8ee'); m.needsUpdate = true;
+}
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
@@ -792,7 +806,7 @@ loader.load('assets/twin-seat-meshy.glb?v=20261127g',
       if (!n.isMesh) return;
       n.castShadow = false; n.receiveShadow = false;
       const mats = Array.isArray(n.material) ? n.material : [n.material];
-      mats.forEach(m => { m.side = THREE.DoubleSide; });
+      mats.forEach(m => { m.side = THREE.DoubleSide; applyChrome(m); });
       if (mats.some(m => STRIP_MATERIALS.includes(m.name))) toStrip.push(n);
     });
     toStrip.forEach(n => n.parent && n.parent.remove(n));
