@@ -372,8 +372,6 @@ const PARTS3D = [
     mat:['leather_pattern'], pal:LEATHER},
   {key:'accent',  label:'List Aksen', desc:'Garis list di tepi kiri-kanan (warna = tint di atas tekstur asli)',
     mat:['leather_accent'], pal:LEATHER},
-  {key:'stitch',  label:'Warna Jahitan', desc:'Benang jahitan di alur panel & tepi kiri-kanan (warna benang, kulit tidak berubah)',
-    mat:[], thread:true, pal:LEATHER},
   {key:'handle',  label:'Handle Sandaran', desc:'Pegangan di bagian atas cangkang belakang kiri-kanan',
     mat:['part_handle'], pal:LEATHER},
   {key:'cupholder', label:'Cup Holder', desc:'Tempat gelas di cangkang belakang kiri-kanan',
@@ -424,7 +422,7 @@ const isLeatherMat = m => /^leather_(main|pattern|accent)$/.test(m.name);
 /* mode ASLI: tekstur asli (warna & benang persis seperti di Blender). Mode TINT: tekstur abu-abu x warna pilihan + benang berwarna dari peta benang */
 function tintMode(m, hex){
   if (tintBaseTexture && m.map && m.map !== tintBaseTexture) m.map = tintBaseTexture;
-  m.color.set(hex); if (m.userData.thr) m.userData.thr.value = 1; m.needsUpdate = true;
+  m.color.set(hex); if (m.userData.thr) m.userData.thr.value = 0; m.needsUpdate = true;
 }
 function origMode(m){
   const dk = m.userData.key;   /* tampilan bawaan = tint warna bawaan di atas tekstur dasar */
@@ -750,7 +748,7 @@ loader.setDRACOLoader(draco);
    map material ditukar ke versi terang itu cuma selagi ada tint custom,
    lalu dikembalikan ke map asli saat direset -- lihat applyColor/resetPart. */
 let tintBaseTexture = null;
-new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261127f', tex => {
+new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261127c', tex => {
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   tintBaseTexture = tex;
