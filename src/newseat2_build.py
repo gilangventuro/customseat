@@ -14,13 +14,16 @@ for o in bpy.data.objects:
         if o.mode!='OBJECT': bpy.ops.object.mode_set(mode='OBJECT')
 def strip(n): return re.sub(r'\.\d{3}$','',n)
 canon={}
+def _mx(o):
+    M=np.array(o.matrix_world); v=np.zeros(len(o.data.vertices)*3); o.data.vertices.foreach_get('co',v); return float((v.reshape(-1,3)@M[:3,:3].T+M[:3,3])[:,0].mean())
 for n in names:
     if n.startswith('Kubus') or n=='Handrest_Tengah_05.002' or n.startswith('Jaring'): continue
+    if abs(_mx(bpy.data.objects[n]))>1.6: continue   # klaster lain di file (x jauh di kiri) tidak dipakai
     canon[n]=strip(n)
-canon['Sandaran_Belakang_Kiri_02.002']='Sandaran_Belakang_Kanan_02'
-canon['Handle_Kiri_00.002']='Handle_Kanan_00'
-canon['Cupholder_Kiri_00.002']='Cupholder_Kanan_00'
-canon['Mesh_0']='Kursi_Kiri'; canon['Mesh_0.001']='Kursi_Kanan'
+for b in ('Sandaran_Belakang_Kiri_02','Handle_Kiri_00','Cupholder_Kiri_00'):
+    for suf,side in (('.003','Kiri'),('.004','Kanan')):
+        if b+suf in canon: canon[b+suf]=b.replace('Kiri',side)
+canon['Mesh_0.001']='Kursi_Kiri'; canon['Mesh_0.003']='Kursi_Kanan'
 log('objek model',len(canon))
 # bahan bersufiks (.003/.004...) digabung ke satu bahan kanonik; dua kayu berbeda tetap dua
 WOODS={}
@@ -69,35 +72,23 @@ def leather(nm):
 LM={nm:leather(nm) for nm in ('leather_main','leather_pattern','leather_accent')}
 CL=np.load(P+'_tmp_tex/classmap.npy'); H=CL.shape[0]; FL=json.load(open(P+'_tmp_tex/flatuv2.json'))
 # ---- badan kursi baru: decimate + kelas per-face dari peta kelas tekstur
-for k in ('Mesh_0','Mesh_0.001'):
+from mathutils import kdtree
+for k in ('Mesh_0.001','Mesh_0.003'):
     o=bpy.data.objects[k]; nn=canon[k]; o.name=nn; o.data.name=nn
     bpy.context.view_layer.objects.active=o
     n0=len(o.data.polygons)
+    # kelas per-face = 3 material yang dipisah user di Blender (Master kursi / Bahan / List -> main / pattern / accent)
+    mi0=np.zeros(n0,dtype=np.int32); o.data.polygons.foreach_get('material_index',mi0)
+    c0=np.zeros(n0*3); o.data.polygons.foreach_get('center',c0); c0=c0.reshape(-1,3)
     md=o.modifiers.new('dec','DECIMATE'); md.ratio=DEC; md.delimit={'UV'}
     bpy.ops.object.modifier_apply(modifier='dec')
     me=o.data
     while len(me.color_attributes): me.color_attributes.remove(me.color_attributes[0])
-    uv=me.uv_layers.active.data; ua=np.zeros(len(uv)*2); uv.foreach_get('uv',ua); ua=ua.reshape(-1,2)
-    cnt=np.zeros(len(me.polygons),dtype=np.int32); me.polygons.foreach_get('loop_total',cnt)
-    st=np.concatenate([[0],np.cumsum(cnt)[:-1]]); cen=np.add.reduceat(ua,st,axis=0)/cnt[:,None]
-    votes=np.zeros((len(cnt),3),dtype=np.int32)
-    def samp(p):
-        x=np.clip((p[:,0]%1.0)*(H-1),0,H-1).astype(int); y=np.clip((1-(p[:,1]%1.0))*(H-1),0,H-1).astype(int); return CL[y,x]
-    cls=samp(cen); votes[np.arange(len(cnt)),cls]+=1
-    for j in range(3):
-        idx=np.minimum(st+j,len(ua)-1); pj=ua[idx]*0.7+cen*0.3; c=samp(pj)
-        ok=cnt>j; votes[np.arange(len(cnt))[ok],c[ok]]+=1
-    fc=votes.argmax(1).astype(np.int32)
-    # haluskan kelas per-face: face yang kelasnya terisolasi (mayoritas tetangga sisi sama berkelas lain) ikut tetangganya -> tepi list rapi
-    _bm=bmesh.new(); _bm.from_mesh(me); _bm.faces.ensure_lookup_table()
-    nb=[list({f2.index for v in f.verts for f2 in v.link_faces if f2 is not f}) for f in _bm.faces]; _bm.free()
-    for _ in range(5):   # mayoritas tetangga (berbagi titik) -> tepi list mulus
-        nf=fc.copy()
-        for i,l in enumerate(nb):
-            if len(l)<3: continue
-            cc=np.bincount(fc[l],minlength=3); m=cc.argmax()
-            if m!=fc[i] and cc[m]*2>len(l) and cc[m]>cc[fc[i]]: nf[i]=m
-        fc=nf
+    n1=len(me.polygons); c1=np.zeros(n1*3); me.polygons.foreach_get('center',c1); c1=c1.reshape(-1,3)
+    kd=kdtree.KDTree(n0)
+    for i in range(n0): kd.insert(c0[i],i)
+    kd.balance()
+    fc=np.array([mi0[kd.find(c1[i])[1]] for i in range(n1)],dtype=np.int32)
     me.materials.clear()
     for nm in ('leather_main','leather_pattern','leather_accent'): me.materials.append(LM[nm])
     me.polygons.foreach_set('material_index',fc)
