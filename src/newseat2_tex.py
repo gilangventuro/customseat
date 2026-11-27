@@ -36,6 +36,19 @@ if NOSTITCH:
     base=Image.fromarray(np.clip(B4f,0,255).astype(np.uint8)).resize((H,H),Image.BOX)
     beads=np.zeros_like(beads)
     A=np.asarray(base).astype(np.float32); L=0.299*A[...,0]+0.587*A[...,1]+0.114*A[...,2]   # tint-base dihitung dari albedo bersih
+    # bercak liar di dalam panel (bintik terang/gelap bukan jahitan, mis. tanda di tengah atas sandaran): buang & isi dari kulit sekitar
+    from scipy.ndimage import binary_erosion as _be, binary_dilation as _bd2, label as _lb, distance_transform_edt as _edt2
+    OT=float(os.environ.get('OUT_T','24')); fix=np.zeros(L.shape,bool)
+    for c in (0,1,2):
+        sel=_be(C==c,iterations=2); m=sel.astype(np.float32)
+        low=gaussian_filter(np.where(sel,L,0),10)/(gaussian_filter(m,10)+1e-6)
+        out=sel&(np.abs(L-low)>OT)
+        lb,nl=_lb(out); ct=np.bincount(lb.ravel()); ok=(ct>=4)&(ct<=2500); ok[0]=False
+        fix|=ok[lb]
+    fix=_bd2(fix,iterations=5); print('bercak dibuang',fix.mean().round(4))
+    idx=_edt2(fix,return_distances=False,return_indices=True); Af=A[idx[0],idx[1]]
+    for c3 in range(3): Af[...,c3]=np.where(fix,gaussian_filter(Af[...,c3],3),A[...,c3])
+    base=Image.fromarray(np.clip(Af,0,255).astype(np.uint8)); A=Af; L=0.299*A[...,0]+0.587*A[...,1]+0.114*A[...,2]
 Sf=np.asarray(Image.fromarray((beads*255).astype(np.uint8)).resize((H,H),Image.BOX)).astype(np.float32)/255
 S=Sf>0.3
 LEVEL,THREAD=0.80,0.96

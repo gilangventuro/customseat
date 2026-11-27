@@ -89,6 +89,29 @@ for k in ('Mesh_0.001','Mesh_0.003'):
     for i in range(n0): kd.insert(c0[i],i)
     kd.balance()
     fc=np.array([mi0[kd.find(c1[i])[1]] for i in range(n1)],dtype=np.int32)
+    # buang pulau kecil (face nyasar berbeda material di tengah panel): komponen < MINF face dilebur ke kelas mayoritas yang mengelilinginya
+    _bm=bmesh.new(); _bm.from_mesh(me); _bm.faces.ensure_lookup_table()
+    adj=[[f2.index for e in f.edges for f2 in e.link_faces if f2 is not f] for f in _bm.faces]; _bm.free()
+    MINF=int(os.environ.get('MINF','400'))
+    for _ in range(3):
+        seen=np.zeros(n1,bool); changed=0
+        for st0 in range(n1):
+            if seen[st0]: continue
+            cl=fc[st0]; comp=[st0]; seen[st0]=True; q=[st0]
+            while q:
+                u=q.pop()
+                for w2 in adj[u]:
+                    if not seen[w2] and fc[w2]==cl: seen[w2]=True; comp.append(w2); q.append(w2)
+            if len(comp)<MINF:
+                cs=set(comp); bc=np.zeros(3,int)
+                for u in comp:
+                    for w2 in adj[u]:
+                        if w2 not in cs: bc[fc[w2]]+=1
+                if bc.sum(): 
+                    for u in comp: fc[u]=bc.argmax()
+                    changed+=1
+        log('pulau kecil dilebur',changed)
+        if not changed: break
     me.materials.clear()
     for nm in ('leather_main','leather_pattern','leather_accent'): me.materials.append(LM[nm])
     me.polygons.foreach_set('material_index',fc)
