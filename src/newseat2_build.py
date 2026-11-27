@@ -181,8 +181,8 @@ for m in bpy.data.materials:
         m.diffuse_color=(0.025,0.025,0.028,1)
 for n in ('Rangka_Kaki_00','Rangka_Kaki_02','Rangka_Kaki_03','Rangka_Kaki_04'):
     o=bpy.data.objects[n]; o.data.materials.clear(); o.data.materials.append(blk)
-for n in ('Handrest_Kanan_05','Handrest_Kiri_07','Handrest_Tengah_03'):   # ujung/penutup bawah bantalan armrest: hitam seperti file Blender (sebelumnya salah perak)
-    o=bpy.data.objects[n]; o.data.materials.clear(); o.data.materials.append(blk)
+for n in ('Handrest_Kanan_05','Handrest_Kiri_07','Handrest_Tengah_03'):   # penutup segitiga di bawah bantalan armrest (3 armrest): perak sesuai permintaan user
+    o=bpy.data.objects[n]; o.data.materials.clear(); o.data.materials.append(alu)
 SH=0.12
 for n in ('Footrest_Kanan_Rangka','Footrest_Kiri_Rangka'):
     o=bpy.data.objects[n]; me=o.data; w=W(o)
