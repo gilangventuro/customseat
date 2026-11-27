@@ -17,12 +17,13 @@ canon={}
 def _mx(o):
     M=np.array(o.matrix_world); v=np.zeros(len(o.data.vertices)*3); o.data.vertices.foreach_get('co',v); return float((v.reshape(-1,3)@M[:3,:3].T+M[:3,3])[:,0].mean())
 for n in names:
-    if n.startswith('Kubus') or n=='Handrest_Tengah_05.002' or n.startswith('Jaring'): continue
+    if n.startswith('Kubus') or n.startswith('Jaring'): continue
     if abs(_mx(bpy.data.objects[n]))>1.6: continue   # klaster lain di file (x jauh di kiri) tidak dipakai
     canon[n]=strip(n)
 for b in ('Sandaran_Belakang_Kiri_02','Handle_Kiri_00','Cupholder_Kiri_00'):
     for suf,side in (('.003','Kiri'),('.004','Kanan')):
         if b+suf in canon: canon[b+suf]=b.replace('Kiri',side)
+canon['Handrest_Tengah_05.002']='Handrest_Kanan_Tutup'   # tutup engsel armrest kanan luar (sebelumnya dibuang -> tampak berlubang)
 canon['Mesh_0.001']='Kursi_Kiri'; canon['Mesh_0.003']='Kursi_Kanan'
 log('objek model',len(canon))
 # bahan bersufiks (.003/.004...) digabung ke satu bahan kanonik; dua kayu berbeda tetap dua
