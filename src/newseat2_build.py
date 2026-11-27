@@ -183,6 +183,11 @@ for n in ('Rangka_Kaki_00','Rangka_Kaki_02','Rangka_Kaki_03','Rangka_Kaki_04'):
     o=bpy.data.objects[n]; o.data.materials.clear(); o.data.materials.append(blk)
 for n in ('Handrest_Kanan_05','Handrest_Kiri_07','Handrest_Tengah_03'):   # penutup segitiga di bawah bantalan armrest (3 armrest): perak sesuai permintaan user
     o=bpy.data.objects[n]; o.data.materials.clear(); o.data.materials.append(alu)
+# ujung armrest tengah: potong ujung penutup perak (Handrest_Tengah_03) agar tidak menjorok keluar dari badan hitam (Handrest_Tengah_01)
+_r=bpy.data.objects['Handrest_Tengah_03']; _g=bpy.data.objects['Handrest_Tengah_01']
+_wr=W(_r); _wg=W(_g); _zl,_zh=_wr[:,2].min()-0.01,_wr[:,2].max()+0.01
+_ye=_wg[(_wg[:,2]>_zl)&(_wg[:,2]<_zh),1].min()+0.04; log('ujung tengah y',_ye,_wr[:,1].min())
+_wr[:,1]=np.maximum(_wr[:,1],_ye); setW(_r,_wr)
 SH=0.12
 for n in ('Footrest_Kanan_Rangka','Footrest_Kiri_Rangka'):
     o=bpy.data.objects[n]; me=o.data; w=W(o)
