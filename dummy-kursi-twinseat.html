@@ -381,8 +381,8 @@ const PARTS3D = [
 ];
 /* material mesh lantai/backdrop bawaan file export — tidak ada pada model ini */
 const STRIP_MATERIALS = [];
-/* warna bawaan kursi: kulit utama hitam, motif abu-slate, list aksen teal, handle & cup holder hitam */
-const DEFAULT_COLORS = {main:'#1b1c1f', pattern:'#6b4636', accent:'#3fa79b', handle:'#1b1c1f', cupholder:'#1b1c1f'};
+/* warna bawaan kursi: kulit utama tan, motif pasir/beige, list aksen putih mutiara, handle & cup holder hitam */
+const DEFAULT_COLORS = {main:'#b27b4c', pattern:'#cbb994', accent:'#f1efea', handle:'#1b1c1f', cupholder:'#1b1c1f'};
 
 const allPal = [...LEATHER];
 const nameOf = (hex, pal) => { if(!hex) return 'Warna asli'; const f=(pal||[]).find(p=>p[1]===hex.toLowerCase())||allPal.find(p=>p[1]===hex.toLowerCase()); return f?f[0]:'Custom'; };
@@ -422,9 +422,11 @@ const isLeatherMat = m => /^leather_(main|pattern|accent)$/.test(m.name);
 /* mode ASLI: tekstur asli (warna & benang persis seperti di Blender). Mode TINT: tekstur abu-abu x warna pilihan + benang berwarna dari peta benang */
 function tintMode(m, hex){
   if (tintBaseTexture && m.map && m.map !== tintBaseTexture) m.map = tintBaseTexture;
-  m.color.set(hex); if (m.userData.thr) m.userData.thr.value = 1; m.needsUpdate = true;
+  m.color.set(hex); if (m.userData.thr) m.userData.thr.value = 0; m.needsUpdate = true;
 }
 function origMode(m){
+  const dk = m.userData.key;   /* tampilan bawaan = tint warna bawaan di atas tekstur dasar */
+  if (tintBaseTexture && dk && DEFAULT_COLORS[dk]) { tintMode(m, DEFAULT_COLORS[dk]); return; }
   if (m.userData.origMapTex) m.map = m.userData.origMapTex;
   m.color.set('#ffffff'); if (m.userData.thr) m.userData.thr.value = 0; m.needsUpdate = true;
 }
@@ -746,11 +748,13 @@ loader.setDRACOLoader(draco);
    map material ditukar ke versi terang itu cuma selagi ada tint custom,
    lalu dikembalikan ke map asli saat direset -- lihat applyColor/resetPart. */
 let tintBaseTexture = null;
-new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261127b', tex => {
+new THREE.TextureLoader().load('assets/textures/leather-tint-base.webp?v=20261127c', tex => {
   tex.flipY = false;
   tex.colorSpace = THREE.SRGBColorSpace;
   tintBaseTexture = tex;
+  applyDefaultLook();
 });
+function applyDefaultLook(){ if (!tintBaseTexture || typeof leatherPairs !== 'function') return; leatherPairs().forEach(([k, m]) => { if (!state.c[k]) origMode(m); }); if (typeof update === 'function' && typeof model !== 'undefined' && model) update(); }
 const origMap = {};
 /* kayu grey gelap: tekstur kayu asli dijadikan hitam-putih & digelapkan, motif serat tetap terlihat */
 const greyCache = new WeakMap();
@@ -831,7 +835,7 @@ loader.load('assets/twin-seat-meshy.glb?v=20261127b',
         if (/^leather_(main|pattern|accent)$/.test(m.name) && !m.userData.threadified) { m.userData.threadified = true; m.userData.origMapTex = m.map; m.userData.thr = {value:0}; threadify(m); }
         const p = findPartByMat(m.name);
         if (!p) return;
-        if (isLeatherMat(m)) m.color.set('#ffffff');
+        if (isLeatherMat(m)) { m.userData.key = p.key; m.color.set('#ffffff'); }
         else if (DEFAULT_COLORS[p.key]) m.color.set(DEFAULT_COLORS[p.key]);   /* warna bawaan ("ASLI") */
         matRefs[p.key].push(m);
         origMap[p.key].push(m.map);
@@ -840,6 +844,7 @@ loader.load('assets/twin-seat-meshy.glb?v=20261127b',
       });
     });
 
+    applyDefaultLook();
     origHex.stitch = 'e9ddc2';
     overlay.style.display = 'none';
     renderParts();
